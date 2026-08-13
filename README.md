@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 63 domain checks
+npm run verify     # typecheck + lint + 63 domain checks + 22 component tests
 ```
 
 ---
@@ -103,6 +103,20 @@ never rise above two. All three are fixed; this table is how the rest stays hone
 
 The one state with no route to it is the empty inbox: notifications can be marked read but never
 removed. That is a missing product decision rather than a bug, and it is listed rather than hidden.
+
+### Why there are component tests as well
+
+Every bug in that first paragraph got through a green `npm run verify`. The 63 domain checks are
+good at what they cover and structurally blind to the rest: a function that returns the right value
+tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
+small — four components, twenty-two tests — and deliberately about *which state is showing* rather
+than about markup or copy, because a suite that fails whenever a word changes is a suite people
+delete. It asserts on accessibility labels where it can, since those are both what a screen reader
+receives and the thing least likely to churn.
+
+Both suites are mutation-tested rather than trusted: deleting the waitlist exemption from
+`assertCancellable`, or making a queueable slot `disabled` again, each fails the relevant test. A
+passing suite that cannot fail is worse than no suite, because it is believed.
 
 `npm run web` is on that list because it did not work either. `react-native-maps` cannot build for
 web, and the runtime `try/catch` around it in `src/components/map/nativeMap.ts` does not help:
@@ -286,6 +300,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 63 checks over the pure domain layer |
+| `npm test` | 22 component tests over the states that render |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
