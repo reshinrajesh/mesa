@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 63 domain checks + 22 component tests
+npm run verify     # typecheck + lint + 63 domain checks + 38 component and integration tests
 ```
 
 ---
@@ -109,14 +109,18 @@ removed. That is a missing product decision rather than a bug, and it is listed 
 Every bug in that first paragraph got through a green `npm run verify`. The 63 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
-small — four components, twenty-two tests — and deliberately about *which state is showing* rather
-than about markup or copy, because a suite that fails whenever a word changes is a suite people
-delete. It asserts on accessibility labels where it can, since those are both what a screen reader
-receives and the thing least likely to churn.
+small and deliberately about *which state is showing* rather than about markup or copy, because a
+suite that fails whenever a word changes is a suite people delete. It asserts on accessibility labels
+where it can, since those are both what a screen reader receives and the thing least likely to churn.
 
-Both suites are mutation-tested rather than trusted: deleting the waitlist exemption from
-`assertCancellable`, or making a queueable slot `disabled` again, each fails the relevant test. A
-passing suite that cannot fail is worse than no suite, because it is believed.
+Every suite is mutation-tested rather than trusted: deleting the waitlist exemption from
+`assertCancellable`, making a queueable slot `disabled` again, or sending empty filter arrays over
+the wire each fails the relevant test. A passing suite that cannot fail is worse than no suite,
+because it is believed.
+
+Note for anyone adding to it: React Native Testing Library 14 made `render` **async** for React 19's
+concurrent renderer. Without `await`, `screen` reports "render function has not been called" while
+`render()` itself appears to succeed.
 
 `npm run web` is on that list because it did not work either. `react-native-maps` cannot build for
 web, and the runtime `try/catch` around it in `src/components/map/nativeMap.ts` does not help:
@@ -165,15 +169,43 @@ result.
 
 ### Swapping in a real backend
 
-`src/services/contracts.ts` is the seam. The UI depends on those six interfaces and never on an
-implementation. `src/services/http.ts` — the real client, with timeout, abort, bearer-token
-injection from SecureStore and status-to-`AppError` mapping — is already written and wired.
+`src/services/contracts.ts` is the seam. The UI depends on those interfaces and never on an
+implementation, so `src/services/index.ts` is the only file that knows which one is in use:
 
-To go live:
+```bash
+EXPO_PUBLIC_USE_MOCK_SERVICES=false EXPO_PUBLIC_API_BASE_URL=http://localhost:4000 npm start
+```
 
-1. Add `restaurantService.http.ts` next to the mock, implementing `RestaurantService` via `request()`.
-2. Switch the export in `src/services/index.ts` behind `config.useMockServices`.
-3. Change nothing else. No screen, hook or store imports a mock module directly.
+Restaurants and reservations are implemented — `restaurantService.http.ts` and
+`reservationService.http.ts`, both against `request()` from `http.ts`, which handles timeout, abort,
+bearer-token injection from SecureStore, and mapping every status onto an `AppError` that already
+carries written copy. Auth, favourites, notifications, reviews and location are still mock-only; they
+are the same exercise and go in the same place, and are absent rather than half-written.
+
+The endpoints those two expect:
+
+| | |
+|---|---|
+| `GET /restaurants` | `?query&sort&cursor&limit&cuisines&priceTiers&kinds&amenities&minRating&maxDistanceKm&openNow&lat&lng` — arrays comma-joined, empties omitted |
+| `GET /restaurants/:id` · `/menu` · `/availability?date&guests` | one venue, its menu, one day's board |
+| `GET /restaurants/suggestions?q` · `/collections?lat&lng` · `/map` | search suggestions, the home rails, raw pins |
+| `GET /reservations` · `GET /reservations/:id` | the guest's own, bearer token required |
+| `POST /reservations` · `PATCH /reservations/:id` · `POST /reservations/:id/cancel` | book, change, cancel |
+| `POST /waitlist` · `POST /waitlist/:id/accept` | join a queue, take the table |
+
+Reads of public data are sent unauthenticated on purpose, so browsing signed-out is the normal path
+rather than a special case. Everything under `/reservations` and `/waitlist` carries the token.
+
+**This is tested, not asserted.** `http.integration.test.ts` starts a real `node:http` server, points
+the client at it and calls the actual service methods — a fetch mock would happily confirm a URL no
+server could route and a header that never got sent. It covers the query flattening, the bearer
+token, JSON round-tripping, path encoding, the mock/HTTP switch itself, and that a 409 becomes "That
+time just went" while the provider's `PG::UndefinedTable` reaches the log and never the screen.
+
+One thing the HTTP services deliberately do not do is run `features/reservations/rules.ts`. On a real
+backend those checks are the server's — it owns the table inventory, and a client deciding for itself
+whether a slot is free would be racing every other client in the restaurant. The rules stay in the
+mock, which is playing the server's part, and stay pure so both can use them.
 
 ### State
 
@@ -300,7 +332,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 63 checks over the pure domain layer |
-| `npm test` | 22 component tests over the states that render |
+| `npm test` | 38 component and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

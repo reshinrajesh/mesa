@@ -9,8 +9,16 @@
 export const config = {
   appName: 'Mesa',
 
-  /** Flip to `false` once a real backend exists behind `apiBaseUrl`. */
-  useMockServices: true,
+  /**
+   * Which service implementations `@/services` exports.
+   *
+   * Environment-driven for the same reason the failure rate is: a switch you
+   * have to edit source to throw is a switch that never gets thrown, and the
+   * HTTP path then rots unexercised behind a claim that it works.
+   *
+   *     EXPO_PUBLIC_USE_MOCK_SERVICES=false EXPO_PUBLIC_API_BASE_URL=http://localhost:4000 npm start
+   */
+  useMockServices: process.env.EXPO_PUBLIC_USE_MOCK_SERVICES !== 'false',
 
   apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://api.mesa.example',
 
