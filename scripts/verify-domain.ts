@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import { generateAvailability, previewBoard, previewSlots } from '@/mock/availability';
 import { mockRestaurants, restaurantById } from '@/mock/restaurants';
 import { seedReservations } from '@/mock/seed';
+import { settleElapsed, SETTLE_AFTER_MS } from '@/features/reservations/lifecycle';
 import { getOpenState, weeklyHours } from '@/features/restaurants/openingHours';
 import { applyFilters, decorate, matchesQuery, sortRestaurants } from '@/features/restaurants/query';
 import { annotateSlots, recommend, suitableForOccasion } from '@/features/recommendations/engine';
@@ -23,7 +24,7 @@ import {
   LOCK_WINDOW_MS,
 } from '@/features/reservations/rules';
 import { config } from '@/constants/config';
-import { emptyFilters, type Reservation } from '@/types';
+import { emptyFilters, type Reservation, type ReservationStatus } from '@/types';
 import { isAppError, type ErrorCode } from '@/utils/errors';
 import {
   addDaysToKey,
@@ -631,6 +632,72 @@ check('an offer is acceptable only while the hold is live', () => {
   refuses('waitlist-offer-expired', () => assertOfferAcceptable(bookingAt(), offerAt));
 });
 
+console.log('\n--- lifecycle ---');
+check('a booking settles four hours after the sitting, not during it', () => {
+  const booking = bookingAt();
+  const sitting = combine(booking.date, booking.time).getTime();
+
+  const midMeal = settleElapsed([booking], sitting + 3_600_000);
+  assert.equal(midMeal.changed, false, 'settled while the mains were still coming');
+  assert.equal(midMeal.reservations[0].status, 'confirmed');
+
+  const after = settleElapsed([booking], sitting + SETTLE_AFTER_MS);
+  assert.equal(after.changed, true);
+  assert.equal(after.reservations[0].status, 'completed');
+});
+check('an unanswered request lapses rather than completing', () => {
+  const request = bookingAt({ status: 'pending' });
+  const sitting = combine(request.date, request.time).getTime();
+
+  assert.equal(settleElapsed([request], sitting - 1000).changed, false);
+  const settled = settleElapsed([request], sitting).reservations[0];
+  // It was never a table, so it cannot have been a dinner.
+  assert.equal(settled.status, 'cancelled');
+  assert.ok(settled.venueMessage?.includes('did not confirm'));
+});
+check('a queue closes with its sitting and drops its entry', () => {
+  const entry = bookingAt({
+    status: 'waitlisted',
+    code: undefined,
+    waitlist: { position: 2, joinedAt: new Date().toISOString() },
+  });
+  const sitting = combine(entry.date, entry.time).getTime();
+
+  const settled = settleElapsed([entry], sitting).reservations[0];
+  assert.equal(settled.status, 'cancelled');
+  assert.equal(settled.waitlist, undefined, 'kept a place in a queue that no longer exists');
+});
+check('settling is idempotent and leaves settled records alone', () => {
+  const sitting = combine('2026-08-14', '20:00').getTime();
+  const wellAfter = sitting + 40 * 3_600_000;
+  const records = [
+    bookingAt({ id: 'a', status: 'confirmed' }),
+    bookingAt({ id: 'b', status: 'cancelled' }),
+    bookingAt({ id: 'c', status: 'completed' }),
+    bookingAt({ id: 'd', status: 'no-show' }),
+  ];
+
+  const once = settleElapsed(records, wellAfter);
+  assert.equal(once.changed, true);
+  const twice = settleElapsed(once.reservations, wellAfter);
+  assert.equal(twice.changed, false, 'a second pass moved something');
+  // Only the confirmed one was the clock's business.
+  assert.deepEqual(
+    once.reservations.map((r) => r.status),
+    ['completed', 'cancelled', 'completed', 'no-show'],
+  );
+});
+check('a booking you made yourself becomes rateable', () => {
+  // The Rate action is gated on `completed`, which nothing but the seed used to
+  // produce — so the entire review-writing flow was unreachable for any booking
+  // a real user made.
+  const mine = bookingAt({ id: 'rsv_mine', status: 'confirmed' });
+  const sitting = combine(mine.date, mine.time).getTime();
+  const settled = settleElapsed([mine], sitting + SETTLE_AFTER_MS).reservations[0];
+  assert.equal(settled.status, 'completed');
+  assert.equal(settled.reviewId, undefined, 'a fresh booking cannot already have a review');
+});
+
 console.log('\n--- data integrity ---');
 check('16 restaurants, all fields populated', () => {
   assert.ok(mockRestaurants.length >= 15, `only ${mockRestaurants.length}`);
@@ -662,6 +729,29 @@ check('every seeded upcoming booking lands on a sitting the venue serves', () =>
       day.slots.some((slot) => slot.time === reservation.time),
       `${reservation.id} sits at ${reservation.time}, which ${restaurant.name} does not serve`,
     );
+  }
+});
+check('every reservation status something can render is a status something produces', () => {
+  // The audit this whole section came out of: `no-show` had a badge, a tone, an
+  // icon, copy and a rule, and nothing in the app could put a booking into it.
+  // A status the UI can draw but the system cannot reach is dead code that
+  // looks alive.
+  const producible = new Set<ReservationStatus>(seedReservations().map((r) => r.status));
+  // Everything the lifecycle and the services can additionally reach.
+  producible.add('completed');
+  producible.add('cancelled');
+  producible.add('waitlisted');
+
+  const renderable: ReservationStatus[] = [
+    'pending',
+    'confirmed',
+    'waitlisted',
+    'completed',
+    'cancelled',
+    'no-show',
+  ];
+  for (const status of renderable) {
+    assert.ok(producible.has(status), `nothing can produce '${status}', but the UI draws it`);
   }
 });
 check('the seeded waitlist entry is a queue, not a table', () => {

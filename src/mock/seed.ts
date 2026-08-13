@@ -148,6 +148,24 @@ export function seedReservations(): Reservation[] {
       reviewId: 'rev_authored_3',
     },
     {
+      // The only way `no-show` can exist. It is a venue's judgement, and the
+      // client has no business inventing one — so without this seed the status
+      // has a badge, a tone, an icon and copy that nothing could ever render.
+      id: 'rsv_yuan_noshow',
+      code: 'T8FK40',
+      restaurantId: 'rst_yuan',
+      date: addDaysToKey(today, -21),
+      time: '20:00',
+      partySize: 2,
+      seating: 'any',
+      occasion: 'none',
+      notes: '',
+      status: 'no-show',
+      createdAt: iso(-28),
+      updatedAt: iso(-21),
+      venueMessage: 'The table was held for 20 minutes. Please call us if something came up.',
+    },
+    {
       id: 'rsv_ember_cancelled',
       code: 'C3VN19',
       restaurantId: 'rst_ember',

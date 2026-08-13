@@ -10,9 +10,14 @@ import { log } from '@/utils/log';
  *
  * This is the one place in the app that uses `require`, and it is deliberate:
  * a static `import` cannot be made conditional.
+ *
+ * The try/catch covers the *runtime* absence. It does not cover the web build:
+ * Metro walks the dependency graph statically and follows this require whether
+ * or not it is guarded, so `nativeMap.web.ts` shadows this file on web to keep
+ * `react-native-maps` out of that graph entirely.
  */
 
-interface NativeMapModule {
+export interface NativeMapModule {
   MapView: React.ComponentType<Record<string, unknown>>;
   Marker: React.ComponentType<Record<string, unknown>>;
 }

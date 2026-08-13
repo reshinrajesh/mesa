@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 57 domain checks
+npm run verify     # typecheck + lint + 63 domain checks
 ```
 
 ---
@@ -60,12 +60,56 @@ Any other email with an 8-character password also signs in, as does Google, Appl
 **Browse without an account**.
 
 A fresh install seeds itself so nothing is empty on first run: three saved restaurants, two upcoming
-bookings, one live waitlist entry, three past ones, five notifications. Seeds apply only when nothing
+bookings, one live waitlist entry, four past ones, five notifications. Seeds apply only when nothing
 has ever been written — clearing your favourites and relaunching leaves them cleared.
 
 The seeded waitlist entry starts two parties from the front, so within a minute of first launch it
 reaches the head of the queue and a table is offered. That is the whole loop, without having to book
 your way into it first.
+
+---
+
+## Seeing every state
+
+A state that ships without ever having been on screen is not built, it is written. An audit found
+three of them. `no-show` had a badge, a tone, an icon and copy, and nothing in the app could produce
+it. Every `ErrorState` sat behind a failure rate you had to edit source to change. And nothing
+settled a booking after its evening, so `completed` came only from the seed — which meant the entire
+rating flow was unreachable for any booking a real user made, and the profile's "visited" count could
+never rise above two. All three are fixed; this table is how the rest stays honest.
+
+| State | How to reach it |
+|---|---|
+| Every `ErrorState` (Home, Explore, Bookings, restaurant, menu) | `EXPO_PUBLIC_MOCK_FAILURE_RATE=0.35 npm start` |
+| Skeletons and optimistic updates | raise `config.mockLatency` |
+| No favourites | un-heart the three seeded ones |
+| No bookings | cancel the seeded ones |
+| No search results | search for something absent, e.g. `zzz` |
+| Empty inbox | reinstall — nothing in the app deletes notifications |
+| Closed that day | pick a Monday at Osteria Grano |
+| Nothing left today | browse after the last seating |
+| Sold out, waitlist offered | an evening at a popular venue — ~2% of nights entirely, 10–25% at peak |
+| Waitlist queued → offered → lapsed | the seeded entry, within a minute of first launch |
+| `no-show` | seeded, in Past bookings |
+| `completed` and the Rate action | any booking of your own, four hours after its sitting |
+| Two-hour change lock | book today's earliest slot, then open the booking |
+| Distance line absent, map centred on the city | decline the location permission |
+| `MapCanvas` instead of native tiles | the default in Expo Go |
+| Photo monogram fallback | airplane mode — the imagery is remote |
+| Offline cache | airplane mode after one successful load |
+| Guest mode | **Browse without an account** |
+| Dark theme, Reduce Motion | the OS settings |
+| All of the above, faster to click through | `npm run web` |
+
+The one state with no route to it is the empty inbox: notifications can be marked read but never
+removed. That is a missing product decision rather than a bug, and it is listed rather than hidden.
+
+`npm run web` is on that list because it did not work either. `react-native-maps` cannot build for
+web, and the runtime `try/catch` around it in `src/components/map/nativeMap.ts` does not help:
+Metro resolves the dependency graph statically and follows a guarded `require` like any other. The
+web target failed to bundle at all, despite the script and `react-native-web` both shipping.
+`nativeMap.web.ts` shadows the module on web so the import never enters the graph — the same fallback
+to `MapCanvas`, decided by the bundler instead of by a `catch`.
 
 ---
 
@@ -98,7 +142,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 57 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 63 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -241,7 +285,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 57 checks over the pure domain layer |
+| `npm run test:domain` | 63 checks over the pure domain layer |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

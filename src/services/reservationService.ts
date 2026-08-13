@@ -4,6 +4,7 @@ import type { ReservationService } from './contracts';
 import { generateAvailability } from '@/mock/availability';
 import { restaurantById } from '@/mock/restaurants';
 import { seedReservations } from '@/mock/seed';
+import { settleElapsed } from '@/features/reservations/lifecycle';
 import {
   assertBookable,
   assertCancellable,
@@ -44,7 +45,16 @@ async function readAll(): Promise<Reservation[]> {
     await storage.set(SEEDED_FLAG, true);
     return seed;
   }
-  return storage.get<Reservation[]>(storageKeys.reservations, []);
+
+  const stored = await storage.get<Reservation[]>(storageKeys.reservations, []);
+
+  // The one place bookings settle. A real backend closes out the evening
+  // server-side; here every read applies the same transitions and persists them
+  // only when something actually moved, so a booking cannot be read as
+  // completed on one screen and confirmed on the next.
+  const settled = settleElapsed(stored);
+  if (settled.changed) await writeAll(settled.reservations);
+  return settled.reservations;
 }
 
 async function writeAll(reservations: Reservation[]): Promise<void> {

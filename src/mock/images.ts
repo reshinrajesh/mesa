@@ -2,9 +2,10 @@
  * Photography.
  *
  * Mock imagery is remote so the repo stays small and the app boots without a
- * download step. Every consumer renders through `RestaurantImage`, which falls
- * back to a typographic monogram card if a URL fails — a broken photo must
- * never leave a grey rectangle in a design that leans this hard on imagery.
+ * download step. Every consumer renders through `SmartImage`, which falls back
+ * to a typographic monogram card if a URL fails — a broken photo must never
+ * leave a grey rectangle in a design that leans this hard on imagery. Because
+ * the URLs are remote, that fallback is reachable by turning the network off.
  */
 
 const UNSPLASH = 'https://images.unsplash.com/photo-';

@@ -21,10 +21,19 @@ export const config = {
   mockLatency: { min: 180, max: 520 },
 
   /**
-   * Probability that a mock read fails, so the error states are exercised in
-   * development instead of being discovered in production. Zero by default.
+   * Probability that a mock read fails.
+   *
+   * Read from the environment rather than hardcoded, because a knob you have to
+   * edit source to turn is a knob nobody turns: every `ErrorState` in the app —
+   * on Explore, Home, Bookings, the restaurant page and the menu — renders only
+   * when a query rejects, which in a default run never happens. They were fully
+   * built and had never been on screen.
+   *
+   *     EXPO_PUBLIC_MOCK_FAILURE_RATE=0.35 npm start
+   *
+   * Zero by default: a demo that fails a third of its reads is not a demo.
    */
-  mockFailureRate: 0,
+  mockFailureRate: Number(process.env.EXPO_PUBLIC_MOCK_FAILURE_RATE ?? 0) || 0,
 
   /** Default map centre when location permission is refused: downtown Lisbon. */
   fallbackLocation: {
