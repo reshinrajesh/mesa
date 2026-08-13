@@ -1,0 +1,126 @@
+import type {
+  AppNotification,
+  AuthTokens,
+  AvailabilityDay,
+  CreateReservationInput,
+  CreateReviewInput,
+  JoinWaitlistInput,
+  Menu,
+  NotificationPreferences,
+  Page,
+  RatingBreakdown,
+  Reservation,
+  Restaurant,
+  RestaurantWithContext,
+  Review,
+  SearchRestaurantsParams,
+  UpdateReservationInput,
+  User,
+} from '@/types';
+
+/**
+ * Service contracts.
+ *
+ * These interfaces are the seam between the UI and the backend. The UI depends
+ * on this file; it never depends on `restaurantService.mock.ts` or on a future
+ * `restaurantService.http.ts`. Swapping implementations is a change to
+ * `services/index.ts` and nothing else.
+ *
+ * Everything that returns a list returns a `Page<T>` even where the mock has
+ * only one page, so infinite scroll can be added later without touching the
+ * call sites.
+ */
+
+export interface RestaurantCollections {
+  popularNearYou: RestaurantWithContext[];
+  recommended: RestaurantWithContext[];
+  trendingCafes: RestaurantWithContext[];
+  topRated: RestaurantWithContext[];
+  newlyOpened: RestaurantWithContext[];
+  /** Venues with a table free in the next two hours. Drives "Book tonight". */
+  availableTonight: RestaurantWithContext[];
+}
+
+export interface RestaurantService {
+  getRestaurants(params: SearchRestaurantsParams): Promise<Page<RestaurantWithContext>>;
+  getRestaurantById(id: string): Promise<RestaurantWithContext>;
+  searchRestaurants(query: string, params?: SearchRestaurantsParams): Promise<Page<RestaurantWithContext>>;
+  /** Lightweight strings for the search screen's suggestion list. */
+  getSuggestions(query: string): Promise<{ label: string; kind: 'restaurant' | 'cuisine' | 'place'; value: string }[]>;
+  getCollections(origin: { latitude: number; longitude: number } | null): Promise<RestaurantCollections>;
+  getMenu(restaurantId: string): Promise<Menu>;
+  getAvailability(restaurantId: string, date: string, guests: number): Promise<AvailabilityDay>;
+  /** Raw records, for map pins and offline caches. */
+  getAllForMap(): Promise<Restaurant[]>;
+}
+
+export interface ReservationService {
+  getReservations(): Promise<Page<Reservation>>;
+  getReservationById(id: string): Promise<Reservation>;
+  createReservation(input: CreateReservationInput): Promise<Reservation>;
+  updateReservation(input: UpdateReservationInput): Promise<Reservation>;
+  /**
+   * Also the way to leave a waitlist: an entry is a reservation that has not
+   * become a table yet, and giving up a place in a queue is the same verb.
+   */
+  cancelReservation(id: string, reason?: string): Promise<Reservation>;
+  /** Joins the queue behind a full slot. Returns a `waitlisted` reservation. */
+  joinWaitlist(input: JoinWaitlistInput): Promise<Reservation>;
+  /** Takes the table being held. Throws `waitlist-offer-expired` once the hold lapses. */
+  acceptWaitlistOffer(id: string): Promise<Reservation>;
+}
+
+export interface AuthService {
+  /** Restores a session from storage on cold start. */
+  restore(): Promise<{ user: User | null; kind: 'authenticated' | 'guest' | 'anonymous' }>;
+  signIn(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }>;
+  signUp(input: { name: string; email: string; phone: string; password: string }): Promise<{
+    user: User;
+    tokens: AuthTokens;
+  }>;
+  requestPasswordReset(email: string): Promise<{ sentTo: string }>;
+  /** Returns the channel the code went to, for the "sent to +351 ••• 048" line. */
+  requestOtp(destination: string): Promise<{ sentTo: string; expiresInSeconds: number }>;
+  verifyOtp(destination: string, code: string): Promise<{ user: User; tokens: AuthTokens }>;
+  /** The Google/Apple buttons route here; the mock returns a demo identity. */
+  signInWithProvider(provider: 'google' | 'apple'): Promise<{ user: User; tokens: AuthTokens }>;
+  continueAsGuest(): Promise<void>;
+  signOut(): Promise<void>;
+  updateProfile(patch: Partial<User>): Promise<User>;
+}
+
+export interface FavoriteService {
+  getFavoriteIds(): Promise<string[]>;
+  addFavorite(restaurantId: string): Promise<void>;
+  removeFavorite(restaurantId: string): Promise<void>;
+}
+
+export interface NotificationService {
+  getNotifications(): Promise<Page<AppNotification>>;
+  markRead(id: string): Promise<void>;
+  markAllRead(): Promise<void>;
+  getPreferences(): Promise<NotificationPreferences>;
+  setPreferences(next: NotificationPreferences): Promise<NotificationPreferences>;
+  /** Requests OS permission and returns whether it was granted. */
+  requestPermission(): Promise<boolean>;
+  /** Schedules the local reminder for a booking. No-op when reminders are off. */
+  scheduleReservationReminder(reservation: Reservation, restaurantName: string): Promise<void>;
+  cancelReservationReminder(reservationId: string): Promise<void>;
+  /**
+   * Files an inbox entry the client generated itself. A backend would push
+   * these; until one exists the client is the only thing that knows a waitlist
+   * was joined, and an inbox that misses those events is worse than none.
+   */
+  record(entry: Omit<AppNotification, 'id' | 'createdAt' | 'readAt'>): Promise<AppNotification>;
+  /** Local alert for the moment a queued table is predicted to come free. */
+  scheduleWaitlistAlert(reservation: Reservation, restaurantName: string, fireAt: Date): Promise<void>;
+  cancelWaitlistAlert(reservationId: string): Promise<void>;
+  /** Registers for remote push. A no-op until a push backend exists. */
+  registerForPush(): Promise<string | null>;
+}
+
+export interface ReviewService {
+  getReviews(restaurantId: string): Promise<Page<Review>>;
+  getBreakdown(restaurantId: string): Promise<RatingBreakdown>;
+  createReview(input: CreateReviewInput): Promise<Review>;
+}
