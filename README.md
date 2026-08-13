@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 39 domain checks
+npm run verify     # typecheck + lint + 52 domain checks
 ```
 
 ---
@@ -93,9 +93,14 @@ src/
   lib/            QueryClient + offline persister
 ```
 
-The rule the layout enforces: **`app/` contains no business logic.** Filtering, sorting, opening
-hours, availability and recommendations all live in `src/features/` as pure functions, which is why
-39 of them can be executed by `npm run test:domain` with no renderer involved.
+The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
+Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
+governing what may be booked all live in `src/features/` as pure functions, which is why 52 checks
+can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
+
+What is left in a service is what a service is for: reading storage, writing storage, minting ids.
+`reservationService` decides nothing; it calls `features/reservations/rules.ts` and persists the
+result.
 
 ### Swapping in a real backend
 
@@ -150,6 +155,14 @@ down in the background, so backgrounding the app cannot freeze the queue, two re
 about the position, and the same function the screen used to draw the countdown is the one the
 service uses to decide whether "Take the table" is still honest. Seven domain checks walk an entry
 from queued to offered to lapsed with no renderer and no fake clock.
+
+**The rules take the clock as an argument.** Every rule in `features/reservations/rules.ts` — the
+two-hour lock, "that slot is full", "one place per queue", "the hold has run out" — receives `now`
+and the day's availability rather than reading a clock or fetching a board. That is what makes them
+executable: a check can walk a booking up to the lock window, across it, and out the other side in
+three lines, and the offer path can be tested at the millisecond before the hold lapses without
+waiting twenty minutes. It is also what lets the same rules run against a real backend's
+availability instead of the mock's.
 
 **A waitlist entry is a reservation, not a second kind of record.** It carries `status: 'waitlisted'`
 and lives in the same list, the same detail screen and the same cancel path. The day it becomes a
@@ -216,7 +229,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 39 checks over the pure domain layer |
+| `npm run test:domain` | 52 checks over the pure domain layer |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

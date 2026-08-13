@@ -13,9 +13,27 @@ import {
   waitlistStatus,
   waitlistSummary,
 } from '@/features/reservations/waitlist';
+import {
+  assertBookable,
+  assertCancellable,
+  assertJoinable,
+  assertModifiable,
+  assertOfferAcceptable,
+  requireRestaurant,
+  LOCK_WINDOW_MS,
+} from '@/features/reservations/rules';
 import { config } from '@/constants/config';
-import { emptyFilters } from '@/types';
-import { addDaysToKey, formatTime, fromDateKey, timeToMinutes, todayKey, toDateKey } from '@/utils/date';
+import { emptyFilters, type Reservation } from '@/types';
+import { isAppError, type ErrorCode } from '@/utils/errors';
+import {
+  addDaysToKey,
+  combine,
+  formatTime,
+  fromDateKey,
+  timeToMinutes,
+  todayKey,
+  toDateKey,
+} from '@/utils/date';
 import { formatDistance, joinMeta, priceLabel } from '@/utils/format';
 import { distanceKm } from '@/utils/geo';
 
@@ -345,6 +363,188 @@ check('queue copy names the queue, never a bare zero', () => {
   assert.equal(queueLabel(1), 'You are next');
   assert.equal(queueLabel(4), '4 ahead of you');
   assert.ok(waitlistSummary({ queueLength: 5 }).includes('5 ahead of you'));
+});
+
+console.log('\n--- reservation rules ---');
+
+/** A board from the next three weeks that actually contains the slot we want to test. */
+function boardWith(restaurantId: string, want: 'free' | 'full') {
+  const restaurant = restaurantById.get(restaurantId)!;
+  for (let i = 1; i < 21; i += 1) {
+    const date = addDaysToKey(todayKey(), i);
+    const day = generateAvailability(restaurant, date, 2);
+    const slot = day.slots.find((s) =>
+      want === 'free' ? s.availability !== 'unavailable' : s.availability === 'unavailable',
+    );
+    if (slot) return { restaurant, day, slot, request: { date, time: slot.time, partySize: 2 } };
+  }
+  throw new Error(`no ${want} slot for ${restaurantId} within three weeks`);
+}
+
+function bookingAt(over: Partial<Reservation> = {}): Reservation {
+  return {
+    id: 'rsv_test',
+    code: 'ABC234',
+    restaurantId: 'rst_grano',
+    date: '2026-08-14',
+    time: '20:00',
+    partySize: 2,
+    seating: 'any',
+    occasion: 'none',
+    notes: '',
+    status: 'confirmed',
+    createdAt: '2026-08-01T10:00:00.000Z',
+    updatedAt: '2026-08-01T10:00:00.000Z',
+    ...over,
+  };
+}
+
+/** Asserts the rule refused, and refused with the code whose copy the UI renders. */
+function refuses(code: ErrorCode, fn: () => void) {
+  assert.throws(fn, (error: unknown) => {
+    assert.ok(isAppError(error), `threw ${error} instead of an AppError`);
+    assert.equal(error.code, code, `refused as '${error.code}', expected '${code}'`);
+    return true;
+  });
+}
+
+check('a free slot books and a full one does not', () => {
+  const free = boardWith('rst_grano', 'free');
+  assert.doesNotThrow(() => assertBookable({ ...free, now: Date.now() }));
+
+  const full = boardWith('rst_grano', 'full');
+  refuses('slot-taken', () => assertBookable({ ...full, now: Date.now() }));
+});
+check('a time the venue never offered is refused, not silently accepted', () => {
+  const board = boardWith('rst_grano', 'free');
+  refuses('slot-taken', () =>
+    assertBookable({ ...board, request: { ...board.request, time: '03:00' }, now: Date.now() }),
+  );
+});
+check('a booking in the past is refused with a field message', () => {
+  const board = boardWith('rst_grano', 'free');
+  const yesterday = addDaysToKey(todayKey(), -1);
+  refuses('validation', () =>
+    assertBookable({ ...board, request: { ...board.request, date: yesterday }, now: Date.now() }),
+  );
+});
+check('a closed day is refused in the venue own words', () => {
+  const restaurant = restaurantById.get('rst_grano')!;
+  const oversize = generateAvailability(restaurant, firstOpenDay('rst_grano'), 40);
+  try {
+    assertBookable({
+      restaurant,
+      day: oversize,
+      request: { date: oversize.date, time: '20:00', partySize: 40 },
+      now: Date.now(),
+    });
+    assert.fail('an oversize party was accepted');
+  } catch (error) {
+    assert.ok(isAppError(error) && error.code === 'no-availability');
+    // The generator's explanation reaches the user rather than generic copy.
+    assert.ok(error.message.includes(restaurant.name), `lost the venue reason: ${error.message}`);
+  }
+});
+check('an unknown restaurant is refused once, at the edge', () => {
+  refuses('restaurant-unavailable', () => requireRestaurant(undefined, 'rst_nope'));
+  assert.equal(requireRestaurant(restaurantById.get('rst_grano'), 'rst_grano').id, 'rst_grano');
+});
+
+check('a walk-in venue refuses a queue', () => {
+  const board = boardWith('rst_pombal', 'full');
+  refuses('waitlist-closed', () =>
+    assertJoinable({ ...board, existing: [], now: Date.now() }),
+  );
+});
+check('a slot with a table free refuses a queue and says to book it', () => {
+  const board = boardWith('rst_grano', 'free');
+  try {
+    assertJoinable({ ...board, existing: [], now: Date.now() });
+    assert.fail('queued for a bookable slot');
+  } catch (error) {
+    assert.ok(isAppError(error) && error.code === 'waitlist-closed');
+    assert.ok(error.message.includes('book it outright'), `unhelpful copy: ${error.message}`);
+  }
+});
+check('joining a full slot returns that slot own queue', () => {
+  const board = boardWith('rst_grano', 'full');
+  const queue = assertJoinable({ ...board, existing: [], now: Date.now() });
+  assert.equal(queue.queueLength, board.slot.waitlist!.queueLength);
+  assert.ok(queue.queueLength >= 1);
+});
+check('one place per sitting', () => {
+  const board = boardWith('rst_grano', 'full');
+  const already = bookingAt({
+    id: 'wlt_existing',
+    status: 'waitlisted',
+    restaurantId: board.restaurant.id,
+    date: board.request.date,
+    time: board.request.time,
+    code: undefined,
+    waitlist: { position: 2, joinedAt: new Date().toISOString() },
+  });
+
+  refuses('waitlist-duplicate', () =>
+    assertJoinable({ ...board, existing: [already], now: Date.now() }),
+  );
+  // A cancelled entry is not a place in the queue, so it must not block a rejoin.
+  assert.doesNotThrow(() =>
+    assertJoinable({
+      ...board,
+      existing: [{ ...already, status: 'cancelled' }],
+      now: Date.now(),
+    }),
+  );
+});
+
+check('changes close two hours before the sitting and not a moment earlier', () => {
+  const booking = bookingAt();
+  const sitting = combine(booking.date, booking.time).getTime();
+
+  assert.doesNotThrow(() => assertModifiable(booking, sitting - LOCK_WINDOW_MS - 1000));
+  refuses('reservation-locked', () => assertModifiable(booking, sitting - LOCK_WINDOW_MS + 1000));
+  refuses('reservation-locked', () => assertModifiable(booking, sitting));
+});
+check('a settled booking cannot be changed whatever the clock says', () => {
+  const sitting = combine('2026-08-14', '20:00').getTime();
+  const wellBefore = sitting - 5 * 3_600_000;
+  for (const status of ['cancelled', 'completed', 'no-show'] as const) {
+    refuses('reservation-locked', () => assertModifiable(bookingAt({ status }), wellBefore));
+  }
+});
+check('a waitlist entry cannot be edited but can always be left', () => {
+  const entry = bookingAt({
+    status: 'waitlisted',
+    code: undefined,
+    waitlist: { position: 3, joinedAt: new Date().toISOString() },
+  });
+  const sitting = combine(entry.date, entry.time).getTime();
+
+  refuses('reservation-locked', () => assertModifiable(entry, sitting - 5 * 3_600_000));
+  // Inside the lock window, past it, and after the sitting: leaving is never
+  // refused, because there is no table to give back late.
+  assert.doesNotThrow(() => assertCancellable(entry, sitting - 60_000));
+  assert.doesNotThrow(() => assertCancellable(entry, sitting + 3_600_000));
+  // A real booking keeps the lock.
+  refuses('reservation-locked', () => assertCancellable(bookingAt(), sitting - 60_000));
+});
+check('an offer is acceptable only while the hold is live', () => {
+  const joinedAt = new Date(2026, 7, 14, 18, 0).toISOString();
+  const origin = Date.parse(joinedAt);
+  const entry = bookingAt({
+    status: 'waitlisted',
+    code: undefined,
+    waitlist: { position: 2, joinedAt },
+  });
+  const offerAt = origin + 2 * config.waitlist.queueMoveMs;
+
+  refuses('waitlist-offer-expired', () => assertOfferAcceptable(entry, offerAt - 1000));
+  assert.equal(assertOfferAcceptable(entry, offerAt).state, 'offered');
+  refuses('waitlist-offer-expired', () =>
+    assertOfferAcceptable(entry, offerAt + config.waitlist.holdMinutes * 60_000),
+  );
+  // And a booking that already took its table cannot take it twice.
+  refuses('waitlist-offer-expired', () => assertOfferAcceptable(bookingAt(), offerAt));
 });
 
 console.log('\n--- data integrity ---');

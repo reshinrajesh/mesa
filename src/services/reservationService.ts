@@ -4,8 +4,15 @@ import type { ReservationService } from './contracts';
 import { generateAvailability } from '@/mock/availability';
 import { restaurantById } from '@/mock/restaurants';
 import { seedReservations } from '@/mock/seed';
-import { waitlistStatus } from '@/features/reservations/waitlist';
-import { combine, formatTime, todayKey } from '@/utils/date';
+import {
+  assertBookable,
+  assertCancellable,
+  assertJoinable,
+  assertModifiable,
+  assertOfferAcceptable,
+  requireRestaurant,
+} from '@/features/reservations/rules';
+import { formatTime } from '@/utils/date';
 import { AppError } from '@/utils/errors';
 import { localId, reservationCode } from '@/utils/id';
 import { storage, storageKeys } from '@/utils/storage';
@@ -14,13 +21,12 @@ import { paginate, simulate } from './latency';
 /**
  * Reservations, persisted locally.
  *
- * The mock enforces the same rules the server will, because a UI that only ever
- * sees the happy path ships without the screens for the unhappy one:
- *   - a slot that reads unavailable cannot be booked
- *   - a booking cannot be made in the past
- *   - changes and cancellations close two hours before the sitting
- *   - a queue can only be joined for a slot that is genuinely full, and only
- *     one place per sitting
+ * What this file does is storage: read the list, apply a write, put it back,
+ * mint ids and codes. What it deliberately does *not* do is decide whether a
+ * write is allowed — every such rule lives in `features/reservations/rules.ts`,
+ * where it can be executed without a storage mock or a real clock. The mock
+ * enforces the same rules the server will, because a UI that only ever sees the
+ * happy path ships without the screens for the unhappy one.
  *
  * Waitlist entries are reservations with `status: 'waitlisted'` rather than a
  * parallel record type. They occupy the same list, the same detail screen and
@@ -29,9 +35,6 @@ import { paginate, simulate } from './latency';
  */
 
 const SEEDED_FLAG = 'mesa.reservations-seeded';
-
-/** How close to the sitting the booking freezes. */
-const LOCK_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 async function readAll(): Promise<Reservation[]> {
   const seeded = await storage.get<boolean>(SEEDED_FLAG, false);
@@ -53,88 +56,13 @@ function byDateDescending(a: Reservation, b: Reservation): number {
   return `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`);
 }
 
-function assertBookable(restaurantId: string, date: string, time: string, partySize: number) {
-  const restaurant = restaurantById.get(restaurantId);
-  if (!restaurant) {
-    throw new AppError('restaurant-unavailable', { debugMessage: `unknown restaurant ${restaurantId}` });
-  }
-  if (date < todayKey()) {
-    throw new AppError('validation', {
-      fields: { date: 'Pick a date from today onwards.' },
-    });
-  }
-
-  const day = generateAvailability(restaurant, date, partySize);
-  if (day.closedReason) {
-    throw new AppError('no-availability', { message: day.closedReason });
-  }
-
-  const slot = day.slots.find((s) => s.time === time);
-  if (!slot) throw new AppError('slot-taken', { debugMessage: `slot ${time} not offered` });
-  if (slot.availability === 'unavailable') throw new AppError('slot-taken');
-}
-
 /**
- * The mirror of `assertBookable`: a queue exists only where a table does not.
- * Returns the depth of that queue, which becomes the joiner's position.
+ * The availability the rules judge against. The mock derives it; an HTTP
+ * implementation would ask the server for the same shape.
  */
-function assertWaitlistable(
-  restaurantId: string,
-  date: string,
-  time: string,
-  partySize: number,
-): number {
-  const restaurant = restaurantById.get(restaurantId);
-  if (!restaurant) {
-    throw new AppError('restaurant-unavailable', { debugMessage: `unknown restaurant ${restaurantId}` });
-  }
-  if (!restaurant.acceptsWaitlist) {
-    throw new AppError('waitlist-closed', {
-      message: `${restaurant.name} does not keep a waitlist. Tables here go to whoever books first.`,
-    });
-  }
-  if (date < todayKey()) {
-    throw new AppError('validation', { fields: { date: 'Pick a date from today onwards.' } });
-  }
-
-  const day = generateAvailability(restaurant, date, partySize);
-  if (day.closedReason) throw new AppError('no-availability', { message: day.closedReason });
-
-  const slot = day.slots.find((s) => s.time === time);
-  if (!slot) throw new AppError('waitlist-closed', { debugMessage: `slot ${time} not offered` });
-  // A slot with a table left is not a queue — send the guest to book it.
-  if (slot.availability !== 'unavailable') {
-    throw new AppError('waitlist-closed', {
-      message: `${formatTime(time)} has a table free. You can book it outright rather than queue for it.`,
-    });
-  }
-  if (!slot.waitlist) throw new AppError('waitlist-closed');
-
-  return slot.waitlist.queueLength;
-}
-
-function assertModifiable(reservation: Reservation) {
-  // A place in a queue has no time or party size to move: the queue is for one
-  // specific sitting. Changing your mind means leaving and joining another.
-  if (reservation.status === 'waitlisted') {
-    throw new AppError('reservation-locked', {
-      message: 'A waitlist entry cannot be edited. Leave the list and join the one for the sitting you want.',
-    });
-  }
-  if (reservation.status === 'cancelled') {
-    throw new AppError('reservation-locked', {
-      message: 'This booking was already cancelled.',
-    });
-  }
-  if (reservation.status === 'completed' || reservation.status === 'no-show') {
-    throw new AppError('reservation-locked', {
-      message: 'This booking is in the past and can no longer be changed.',
-    });
-  }
-  const sitting = combine(reservation.date, reservation.time).getTime();
-  if (sitting - Date.now() < LOCK_WINDOW_MS) {
-    throw new AppError('reservation-locked');
-  }
+function boardFor(restaurantId: string, request: { date: string; partySize: number }) {
+  const restaurant = requireRestaurant(restaurantById.get(restaurantId), restaurantId);
+  return { restaurant, day: generateAvailability(restaurant, request.date, request.partySize) };
 }
 
 export const reservationService: ReservationService = {
@@ -155,7 +83,7 @@ export const reservationService: ReservationService = {
 
   async createReservation(input) {
     return simulate(async () => {
-      assertBookable(input.restaurantId, input.date, input.time, input.partySize);
+      assertBookable({ ...boardFor(input.restaurantId, input), request: input, now: Date.now() });
 
       const now = new Date().toISOString();
       const reservation: Reservation = {
@@ -186,7 +114,7 @@ export const reservationService: ReservationService = {
       const all = await readAll();
       const existing = all.find((r) => r.id === input.id);
       if (!existing) throw new AppError('not-found', { debugMessage: `no reservation ${input.id}` });
-      assertModifiable(existing);
+      assertModifiable(existing, Date.now());
 
       const next: Reservation = {
         ...existing,
@@ -197,7 +125,11 @@ export const reservationService: ReservationService = {
 
       // Re-check availability whenever the sitting itself moved.
       if (next.date !== existing.date || next.time !== existing.time || next.partySize !== existing.partySize) {
-        assertBookable(next.restaurantId, next.date, next.time, next.partySize);
+        assertBookable({
+          ...boardFor(next.restaurantId, next),
+          request: next,
+          now: Date.now(),
+        });
       }
 
       await writeAll(all.map((r) => (r.id === next.id ? next : r)));
@@ -211,9 +143,7 @@ export const reservationService: ReservationService = {
       const existing = all.find((r) => r.id === id);
       if (!existing) throw new AppError('not-found', { debugMessage: `no reservation ${id}` });
       if (existing.status === 'cancelled') return existing;
-      // Leaving a queue is always allowed. There is no table to release late
-      // and no kitchen to inconvenience, so the two-hour lock does not apply.
-      if (existing.status !== 'waitlisted') assertModifiable(existing);
+      assertCancellable(existing, Date.now());
 
       const next: Reservation = {
         ...existing,
@@ -228,26 +158,13 @@ export const reservationService: ReservationService = {
 
   async joinWaitlist(input) {
     return simulate(async () => {
-      const queueLength = assertWaitlistable(
-        input.restaurantId,
-        input.date,
-        input.time,
-        input.partySize,
-      );
-
       const all = await readAll();
-      // One place per sitting. Two entries would queue the same guest against
-      // themselves and double every notification they get.
-      const duplicate = all.find(
-        (r) =>
-          r.status === 'waitlisted' &&
-          r.restaurantId === input.restaurantId &&
-          r.date === input.date &&
-          r.time === input.time,
-      );
-      if (duplicate) {
-        throw new AppError('waitlist-duplicate', { debugMessage: `already queued as ${duplicate.id}` });
-      }
+      const queue = assertJoinable({
+        ...boardFor(input.restaurantId, input),
+        request: input,
+        existing: all,
+        now: Date.now(),
+      });
 
       const now = new Date().toISOString();
       const entry: Reservation = {
@@ -264,7 +181,7 @@ export const reservationService: ReservationService = {
         status: 'waitlisted',
         createdAt: now,
         updatedAt: now,
-        waitlist: { position: Math.max(1, queueLength), joinedAt: now },
+        waitlist: { position: Math.max(1, queue.queueLength), joinedAt: now },
       };
 
       await writeAll([entry, ...all]);
@@ -277,23 +194,7 @@ export const reservationService: ReservationService = {
       const all = await readAll();
       const existing = all.find((r) => r.id === id);
       if (!existing) throw new AppError('not-found', { debugMessage: `no reservation ${id}` });
-      if (existing.status !== 'waitlisted') {
-        throw new AppError('waitlist-offer-expired', {
-          message: 'This entry is no longer on the waitlist.',
-          debugMessage: `status ${existing.status}`,
-        });
-      }
-
-      // The same pure function the screen used to draw the countdown decides
-      // whether the hold is still live, so the button and the server can never
-      // disagree about what the user was looking at.
-      const status = waitlistStatus(existing);
-      if (status?.state === 'queued') {
-        throw new AppError('waitlist-offer-expired', {
-          message: 'No table is being held yet. We will tell you the moment one is.',
-        });
-      }
-      if (status?.state !== 'offered') throw new AppError('waitlist-offer-expired');
+      assertOfferAcceptable(existing, Date.now());
 
       const next: Reservation = {
         ...existing,
