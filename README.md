@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 52 domain checks
+npm run verify     # typecheck + lint + 57 domain checks
 ```
 
 ---
@@ -26,6 +26,9 @@ waitlistable or unavailable, with the quiet ones marked and explained.
 entry that shows its place in the queue, advances as parties ahead resolve, and turns into a real
 offer — a table held for twenty minutes — announced by a scheduled local notification. Taking it
 converts the entry into a confirmed booking with a code; letting it lapse keeps the place in line.
+Cards say so before you commit to a venue: a restaurant with nothing left tonight shows a dashed
+"Full tonight · waitlist" pill where its free times would be, rather than an empty space that reads
+as no availability at all.
 
 **Management.** Upcoming and past bookings with directions, modify, cancel, rebook and rate. Six
 statuses, a two-hour change lock, optimistic cancel with rollback.
@@ -95,7 +98,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 52 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 57 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -144,6 +147,15 @@ that set them. Filters and cancel are likewise a sheet and a dialog rather than 
 `(restaurant, date, party size, time)`, so refetching does not reshuffle the board under the user
 and the "that time just went" path is testable. The mock enforces the same rules the server will:
 no booking in the past, no booking a full slot, no changes inside two hours.
+
+**Some nights are simply gone.** Demand is a property of the *evening* — seeded on
+`(restaurant, date)` and weighted by popularity and the weekend — not of each slot independently.
+That distinction is not cosmetic. With independent rolls a ten-slot evening sold out about once in
+ten thousand, which meant the waitlist, the "nothing free that day" empty state and the card's
+no-slots branch were all unreachable: code that ships without ever having been seen. With demand on
+the night, about 2% of venue-nights sell out entirely and 10–25% lose their whole 7–9pm window, both
+concentrated in the rooms you would expect. A domain check asserts both bounds, because a mock that
+never sells out and one that always does are equally useless.
 
 **Cards never advertise a slot the booking screen refuses.** The card strip and the booking board
 read the same generator — verified by a domain check.
@@ -229,7 +241,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 52 checks over the pure domain layer |
+| `npm run test:domain` | 57 checks over the pure domain layer |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

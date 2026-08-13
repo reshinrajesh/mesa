@@ -1,7 +1,7 @@
 /* Smoke test for the pure domain layer. Run with tsx from the project root. */
 import assert from 'node:assert';
 
-import { generateAvailability, previewSlots } from '@/mock/availability';
+import { generateAvailability, previewBoard, previewSlots } from '@/mock/availability';
 import { mockRestaurants, restaurantById } from '@/mock/restaurants';
 import { seedReservations } from '@/mock/seed';
 import { getOpenState, weeklyHours } from '@/features/restaurants/openingHours';
@@ -163,6 +163,90 @@ check('every card preview slot is actually bookable today', () => {
       assert.ok(slot, `${restaurant.name} advertised ${time} which is not on the board`);
       assert.notEqual(slot!.availability, 'unavailable', `${restaurant.name} advertised a full slot`);
     }
+  }
+});
+
+check('some nights sell out, but not so many that the app is unusable', () => {
+  // Both bounds matter. With no sold-out nights the waitlist, the "nothing free
+  // that day" empty state and the card's no-slots branch are all unreachable —
+  // that was true until demand became a property of the evening rather than of
+  // each slot independently. With too many, the app is a wall of dashed pills.
+  let nights = 0;
+  let soldOut = 0;
+
+  for (const restaurant of mockRestaurants) {
+    for (let i = 1; i <= 28; i += 1) {
+      const day = generateAvailability(restaurant, addDaysToKey(todayKey(), i), 2);
+      if (day.slots.length === 0) continue;
+      nights += 1;
+      if (day.slots.every((slot) => slot.availability === 'unavailable')) soldOut += 1;
+    }
+  }
+
+  const rate = soldOut / nights;
+  assert.ok(soldOut > 0, 'no venue sells out on any of the next 28 nights');
+  assert.ok(rate < 0.15, `${(rate * 100).toFixed(1)}% of nights are sold out`);
+});
+check('demand belongs to the evening, not to each slot', () => {
+  // A busy night is a run of full slots, not full ones scattered through a
+  // quiet evening. Measured as: the busiest night is meaningfully fuller than
+  // the quietest one at the same venue.
+  const restaurant = restaurantById.get('rst_lumen')!;
+  const rates: number[] = [];
+  for (let i = 1; i <= 28; i += 1) {
+    const day = generateAvailability(restaurant, addDaysToKey(todayKey(), i), 2);
+    if (day.slots.length === 0) continue;
+    rates.push(day.slots.filter((s) => s.availability === 'unavailable').length / day.slots.length);
+  }
+  const spread = Math.max(...rates) - Math.min(...rates);
+  assert.ok(spread > 0.4, `nights are all alike; spread was only ${spread.toFixed(2)}`);
+});
+check('a card offers times or a queue, never both', () => {
+  for (const restaurant of mockRestaurants) {
+    const board = previewBoard(restaurant);
+    assert.ok(
+      !(board.slots.length > 0 && board.waitlistTonight),
+      `${restaurant.id} advertised a table and a queue at once`,
+    );
+
+    if (!board.waitlistTonight) continue;
+    // The claim has to be backed by tonight's actual board, not by the venue
+    // merely being the sort of place that keeps a list.
+    assert.ok(restaurant.acceptsWaitlist, `${restaurant.id} offered a queue it does not keep`);
+    const today = generateAvailability(restaurant, todayKey(), 2);
+    assert.ok(today.slots.some(isWaitlistable), `${restaurant.id} has no queueable slot tonight`);
+  }
+});
+check('a sold-out night at a waitlist venue does show the queue', () => {
+  // The card signal is worth nothing if it cannot fire. Find a night that is
+  // genuinely sold out and assert the card offers the queue rather than an
+  // empty space that reads as "no availability, move on".
+  for (const restaurant of mockRestaurants.filter((r) => r.acceptsWaitlist)) {
+    for (let i = 1; i <= 28; i += 1) {
+      const date = addDaysToKey(todayKey(), i);
+      const day = generateAvailability(restaurant, date, 2);
+      if (day.slots.length === 0) continue;
+      if (!day.slots.every((slot) => slot.availability === 'unavailable')) continue;
+
+      const board = previewBoard(restaurant, 2, 3, date);
+      assert.equal(board.slots.length, 0, 'a sold-out night still advertised times');
+      assert.equal(board.waitlistTonight, true, `${restaurant.id} hid its queue on ${date}`);
+      return;
+    }
+  }
+  assert.fail('no sold-out night at a waitlist venue in the next 28 days');
+});
+check('a venue closed tonight offers no queue for tonight', () => {
+  // Closed, or past the last seating: either way there is no sitting left to be
+  // next in line for, and the card must not imply otherwise.
+  for (const restaurant of mockRestaurants) {
+    const today = generateAvailability(restaurant, todayKey(), 2);
+    if (today.slots.length > 0) continue;
+    assert.equal(
+      previewBoard(restaurant).waitlistTonight,
+      false,
+      `${restaurant.id} offered a queue with no sittings left`,
+    );
   }
 });
 

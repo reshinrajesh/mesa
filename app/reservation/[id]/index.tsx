@@ -152,6 +152,12 @@ export default function ReservationDetailScreen() {
             onAccept={
               waitlist.state === 'offered' ? () => accept.mutate(reservation.id) : undefined
             }
+            onTryAnotherTime={() =>
+              router.push({
+                pathname: '/reserve/[restaurantId]',
+                params: { restaurantId: reservation.restaurantId },
+              })
+            }
           />
         ) : null}
 

@@ -6,7 +6,7 @@ import type {
   SortKey,
 } from '@/types';
 
-import { previewSlots } from '@/mock/availability';
+import { previewBoard } from '@/mock/availability';
 import { distanceKm } from '@/utils/geo';
 import { getOpenState } from './openingHours';
 
@@ -25,13 +25,18 @@ export function decorate(
   now = new Date(),
 ): RestaurantWithContext {
   const openState = getOpenState(restaurant, now);
+  // One board, read once: the times a card offers and whether it can offer a
+  // queue instead are the same question asked of the same evening.
+  const board = previewBoard(restaurant);
+
   return {
     ...restaurant,
     distanceKm: origin ? distanceKm(origin, restaurant.coordinates) : null,
     isOpenNow: openState.isOpen,
     minutesUntilStatusChange: openState.minutesUntilChange,
     isFavorite: favoriteIds.has(restaurant.id),
-    nextSlots: previewSlots(restaurant),
+    nextSlots: board.slots,
+    waitlistTonight: board.waitlistTonight,
   };
 }
 

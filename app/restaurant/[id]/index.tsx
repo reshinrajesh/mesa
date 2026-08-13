@@ -406,6 +406,20 @@ export default function RestaurantDetailScreen() {
           },
         ]}
       >
+        {/* Said here rather than only inside the wizard, because this is where
+            someone decides whether this place is still an option tonight. The
+            button stays "Reserve a table": another evening may be wide open,
+            and the board is where that choice belongs. */}
+        {restaurant.waitlistTonight ? (
+          <View style={styles.ctaNote}>
+            <Ionicons name="hourglass-outline" size={14} color={theme.colors.inkMuted} />
+            <Text variant="caption" tone="muted" numberOfLines={2} style={{ flex: 1 }}>
+              Fully booked tonight — but {restaurant.name} keeps a waitlist, and another evening may
+              be free.
+            </Text>
+          </View>
+        ) : null}
+
         <Button
           label="Reserve a table"
           size="lg"
@@ -579,5 +593,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth * 2,
+  },
+  ctaNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    paddingBottom: 9,
   },
 });

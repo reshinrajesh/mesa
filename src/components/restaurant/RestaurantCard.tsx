@@ -13,7 +13,7 @@ import { Rating } from '@/components/ui/Rating';
 import { SmartImage } from '@/components/ui/SmartImage';
 import { Text } from '@/components/ui/Text';
 import { FavoriteButton } from './FavoriteButton';
-import { SlotStrip } from './SlotStrip';
+import { SlotStrip, WaitlistPill } from './SlotStrip';
 
 export interface RestaurantCardProps {
   restaurant: RestaurantWithContext;
@@ -109,6 +109,17 @@ export const RestaurantCard = React.memo(function RestaurantCard({
               router.push({
                 pathname: '/reserve/[restaurantId]',
                 params: { restaurantId: restaurant.id, time },
+              })
+            }
+            style={{ marginTop: theme.spacing.xs }}
+          />
+        ) : showSlots && restaurant.waitlistTonight ? (
+          <WaitlistPill
+            restaurantName={restaurant.name}
+            onPress={() =>
+              router.push({
+                pathname: '/reserve/[restaurantId]',
+                params: { restaurantId: restaurant.id },
               })
             }
             style={{ marginTop: theme.spacing.xs }}

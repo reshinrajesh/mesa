@@ -18,6 +18,8 @@ export interface WaitlistCardProps {
   restaurantName: string;
   onAccept?: () => void;
   accepting?: boolean;
+  /** Offered on a lapsed hold: the board, so the dead end names a way out. */
+  onTryAnotherTime?: () => void;
 }
 
 /**
@@ -45,6 +47,7 @@ export function WaitlistCard({
   restaurantName,
   onAccept,
   accepting = false,
+  onTryAnotherTime,
 }: WaitlistCardProps) {
   const theme = useTheme();
 
@@ -114,6 +117,19 @@ export function WaitlistCard({
           The hold ran out before it was confirmed. You are still on the list for{' '}
           {formatTime(time)} — if another table frees up, it comes to you first.
         </Text>
+
+        {/* Staying on the list is the default, so it is the thing that needs no
+            button. What this state was missing is the other option: waiting for
+            a second table that may not come is a dead end without one. */}
+        {onTryAnotherTime ? (
+          <Button
+            label="See other times"
+            variant="secondary"
+            fullWidth
+            icon="calendar-outline"
+            onPress={onTryAnotherTime}
+          />
+        ) : null}
       </View>
     );
   }

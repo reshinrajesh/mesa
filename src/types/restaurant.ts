@@ -119,4 +119,10 @@ export interface RestaurantWithContext extends Restaurant {
   isFavorite: boolean;
   /** Next few bookable times today, for the card's slot strip. */
   nextSlots: string[];
+  /**
+   * Nothing left to book tonight, but the venue keeps a waitlist. Only ever
+   * true when `nextSlots` is empty — a card has one line for this, and a free
+   * table always outranks a place in a queue.
+   */
+  waitlistTonight: boolean;
 }
