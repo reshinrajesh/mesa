@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 89 domain checks + 42 component and integration tests
+npm run verify     # typecheck + lint + 89 domain checks + 50 component, service and integration tests
 ```
 
 ---
@@ -138,9 +138,24 @@ Every suite is mutation-tested rather than trusted: deleting the waitlist exempt
 the wire each fails the relevant test. A passing suite that cannot fail is worse than no suite,
 because it is believed.
 
+That is not a formality. The inbox retention test was written, passed, and was then found to assert
+nothing: it compared the stored value before and after, and an unconditional rewrite puts back a
+byte-identical array. Rewriting it to watch the write itself took two more corrections — `jest.spyOn`
+on AsyncStorage hands back the existing mock *with this test's own setup writes already in its
+history*, and `toHaveBeenCalledWith(key, value)` never matches because AsyncStorage is called with a
+third callback argument, so the negated assertion passed either way. Three plausible-looking
+assertions in a row, none of which could fail. The version in the file now fails when the branch is
+removed and when it is made unconditional, which is the only evidence worth having.
+
+`notificationService.test.ts` is the third kind: it drives the real service against the real
+AsyncStorage mock, because the pure rules are already proved by the domain checks and what is left
+unproven is whether the service wrote the result back.
+
 Note for anyone adding to it: React Native Testing Library 14 made `render` **async** for React 19's
 concurrent renderer. Without `await`, `screen` reports "render function has not been called" while
-`render()` itself appears to succeed.
+`render()` itself appears to succeed. And never call `mockRestore` on an AsyncStorage method — those
+mocks *are* the storage implementation, so restoring one leaves it returning `undefined` where the
+next test expects a promise.
 
 `npm run web` is on that list because it did not work either. `react-native-maps` cannot build for
 web, and the runtime `try/catch` around it in `src/components/map/nativeMap.ts` does not help:
@@ -382,7 +397,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 89 checks over the pure domain layer and the palette |
-| `npm test` | 42 component and HTTP integration tests |
+| `npm test` | 50 component, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
