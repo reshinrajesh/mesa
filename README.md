@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 98 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 90 domain checks + 102 component, screen, hook and service tests
 ```
 
 ---
@@ -444,7 +444,7 @@ The foundation was built with these in mind. Each is additive:
 | Feature | Where it goes |
 |---|---|
 | Real backend | `services/*.http.ts`, written and tested against a real socket |
-| Push notifications | `notificationService.registerForPush()`, currently an intentional no-op |
+| Push notifications | wired: `usePushRegistration` posts a token to `/push/register` for anyone who has already granted permission. The mock returns null; only the server side is missing |
 | Payments, deposits | a new `paymentService` contract; the review screen has the slot for it |
 | Loyalty, offers, coupons | `uiStore` ambient state + a rail on Home |
 | AI recommendations | replace `scoreRestaurant` in `features/recommendations/engine.ts`, keep `reason` |
@@ -462,7 +462,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 98 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 102 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

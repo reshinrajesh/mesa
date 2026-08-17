@@ -71,6 +71,22 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
+/**
+ * Whether permission is already granted, without asking for it.
+ *
+ * The distinction matters: `requestPermission` shows the OS prompt, and a
+ * prompt at the wrong moment is a permanent no. Anything that wants to act only
+ * when the user has *already* said yes asks this instead.
+ */
+export async function hasPermission(): Promise<boolean> {
+  try {
+    const { granted } = await Notifications.getPermissionsAsync();
+    return granted;
+  } catch {
+    return false;
+  }
+}
+
 export async function requestPermission(): Promise<boolean> {
   try {
     await ensureAndroidChannel();
