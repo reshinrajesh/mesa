@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 75 domain checks + 42 component and integration tests
+npm run verify     # typecheck + lint + 80 domain checks + 42 component and integration tests
 ```
 
 ---
@@ -34,9 +34,9 @@ as no availability at all.
 statuses, a two-hour change lock, optimistic cancel with rollback.
 
 **The rest.** Favourites with local persistence, a profile with preferences and saved addresses,
-a notification inbox with real local reminder scheduling and its own retention policy, and full
-auth screens (welcome, sign in,
-sign up, forgot password, OTP, Google/Apple, guest browsing) against a mock identity service.
+a notification inbox with real local reminder scheduling, its own retention policy and taps that open
+what they are about, and full auth screens (welcome, sign in, sign up, forgot password, OTP,
+Google/Apple, guest browsing) against a mock identity service.
 
 ### Deliberately not built
 
@@ -91,6 +91,7 @@ never rise above two. All three are fixed; this table is how the rest stays hone
 | Nothing left today | browse after the last seating |
 | Sold out, waitlist offered | an evening at a popular venue — ~2% of nights entirely, 10–25% at peak |
 | Waitlist queued → offered → lapsed | the seeded entry, within a minute of first launch |
+| A tapped notification opening what it is about | tap the waitlist alert, from the lock screen or a cold start |
 | `no-show` | seeded, in Past bookings |
 | `completed` and the Rate action | any booking of your own, four hours after its sitting |
 | Two-hour change lock | book today's earliest slot, then open the booking |
@@ -113,7 +114,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 75 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 80 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -167,7 +168,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 75 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 80 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -273,6 +274,18 @@ three lines, and the offer path can be tested at the millisecond before the hold
 waiting twenty minutes. It is also what lets the same rules run against a real backend's
 availability instead of the mock's.
 
+**A notification decides nothing about where it goes.** Every alert the app schedules carries an
+`href`, and for a while nothing read it — tapping "a table just came free, confirm before the hold
+runs out" opened the app wherever it happened to be, which is the one notification in Mesa with a
+deadline attached leading nowhere. It is wired now, through `features/notifications/routing.ts`,
+which is a **whitelist rather than a redirect**: it matches the two shapes the app actually emits and
+returns null for everything else, including internal-looking paths nobody schedules. Today the client
+writes that payload; the day `registerForPush` is finished, it comes from the network, and an app
+that hands an arbitrary payload string to `router.push` opens whatever it was sent. Five domain
+checks throw hostile payloads at it, and one of them asserts the other direction — that every href
+the app itself files still resolves — because a gate the app's own notifications cannot pass is just
+the original bug wearing a lock.
+
 **A waitlist entry is a reservation, not a second kind of record.** It carries `status: 'waitlisted'`
 and lives in the same list, the same detail screen and the same cancel path. The day it becomes a
 table it is already the row the user has been watching. What it does not carry is a booking code:
@@ -345,7 +358,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 75 checks over the pure domain layer and the palette |
+| `npm run test:domain` | 80 checks over the pure domain layer and the palette |
 | `npm test` | 42 component and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |

@@ -16,6 +16,7 @@ import {
   Text,
 } from '@/components/ui';
 import { readCount } from '@/features/notifications/inbox';
+import { routeFor } from '@/features/notifications/routing';
 import {
   useClearReadNotifications,
   useDismissNotification,
@@ -40,7 +41,11 @@ export default function NotificationsScreen() {
 
   const open = (notification: AppNotification) => {
     if (notification.readAt === null) markRead.mutate(notification.id);
-    if (notification.href) router.push(notification.href as never);
+    // Through the same gate as a tap on the OS notification. An entry in this
+    // list and a banner on the lock screen are the same record, and a route
+    // that is not safe to open from one is not safe to open from the other.
+    const route = routeFor(notification);
+    if (route) router.push(route as never);
   };
 
   return (

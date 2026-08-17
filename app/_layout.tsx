@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CACHE_BUSTER, createQueryClient, queryPersister } from '@/lib/queryClient';
 import { ToastHost } from '@/components/ui';
 import { useAppFonts } from '@/hooks/useAppFonts';
+import { useNotificationRouting } from '@/hooks/useNotificationRouting';
 import { useAuthStore } from '@/store/authStore';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useSearchStore } from '@/store/searchStore';
@@ -69,6 +70,7 @@ function AppShell() {
   }, [bootReady]);
 
   useProtectedRoute(bootReady);
+  useNotificationRouting(bootReady);
 
   // Holding the splash rather than flashing an unstyled frame first.
   if (!bootReady) return null;

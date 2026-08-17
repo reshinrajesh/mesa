@@ -3,7 +3,7 @@ import assert from 'node:assert';
 
 import { generateAvailability, previewBoard, previewSlots } from '@/mock/availability';
 import { mockRestaurants, restaurantById } from '@/mock/restaurants';
-import { seedReservations } from '@/mock/seed';
+import { seedNotifications, seedReservations } from '@/mock/seed';
 import { settleElapsed, SETTLE_AFTER_MS } from '@/features/reservations/lifecycle';
 import { getOpenState, weeklyHours } from '@/features/restaurants/openingHours';
 import { applyFilters, decorate, matchesQuery, sortRestaurants } from '@/features/restaurants/query';
@@ -23,6 +23,7 @@ import {
   requireRestaurant,
   LOCK_WINDOW_MS,
 } from '@/features/reservations/rules';
+import { routeFor } from '@/features/notifications/routing';
 import {
   clearRead as clearReadNotifications,
   dismiss as dismissNotification,
@@ -862,6 +863,67 @@ check('undo puts an entry back where it was, not at the top', () => {
   );
   // Undo pressed twice must not duplicate the row.
   assert.equal(restoreNotification(after, middle).length, 3);
+});
+
+console.log('\n--- notification routing ---');
+
+check('every notification the app files leads somewhere', () => {
+  // The coupling this exists to hold: the scheduler writes hrefs and the router
+  // gate reads them, and neither imports the other. A notification that arrives
+  // with a deadline on it and opens nothing is the bug this whole module is
+  // about, so the seeds and the format the service writes are both checked.
+  for (const notification of seedNotifications()) {
+    if (!notification.href) continue;
+    assert.ok(routeFor(notification), `seeded notification leads nowhere: ${notification.href}`);
+  }
+  const reservation = seedReservations()[0];
+  assert.equal(
+    routeFor({ href: `/reservation/${reservation.id}` }),
+    `/reservation/${reservation.id}`,
+    'the path notificationService schedules is not one the gate accepts',
+  );
+});
+
+check('a notification cannot send the app outside itself', () => {
+  for (const href of [
+    'https://evil.example/reservation/rsv_1',
+    '//evil.example/reservation/rsv_1',
+    'mesa://reservation/rsv_1',
+    'javascript:alert(1)',
+    'reservation/rsv_1',
+  ]) {
+    assert.equal(routeFor({ href }), null, `accepted an external destination: ${href}`);
+  }
+});
+
+check('only the two routes a notification is about are reachable', () => {
+  // Internal, real, and still refused: the gate is a whitelist, not a check
+  // that the string looks like a path.
+  for (const href of ['/profile/settings', '/(tabs)/profile', '/', '/reservation/', '/restaurant']) {
+    assert.equal(routeFor({ href }), null, `accepted an unlisted route: ${href}`);
+  }
+  assert.equal(routeFor({ href: '/restaurant/rst_maiz' }), '/restaurant/rst_maiz');
+});
+
+check('nothing rides along behind a valid id', () => {
+  // The route is rebuilt from a validated id rather than echoed, so a query
+  // string, a fragment or a second segment cannot survive by attaching itself
+  // to something that passed.
+  for (const href of [
+    '/reservation/rsv_1?redirect=https://evil.example',
+    '/reservation/rsv_1#/../profile',
+    '/reservation/rsv_1/edit',
+    '/reservation/../profile/settings',
+    `/reservation/${'x'.repeat(65)}`,
+  ]) {
+    assert.equal(routeFor({ href }), null, `accepted a decorated id: ${href}`);
+  }
+});
+
+check('a payload that is not a payload is refused rather than thrown at', () => {
+  for (const data of [null, undefined, 'string', 42, [], {}, { href: 42 }, { href: null }]) {
+    assert.equal(routeFor(data), null);
+  }
 });
 
 console.log('\n--- contrast ---');

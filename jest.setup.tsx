@@ -33,6 +33,10 @@ jest.mock('expo-notifications', () => ({
   scheduleNotificationAsync: jest.fn().mockResolvedValue('id'),
   cancelScheduledNotificationAsync: jest.fn(),
   setNotificationChannelAsync: jest.fn(),
+  // `null` is the real "no notification was tapped" value, not a stand-in:
+  // the hook returns undefined only while it is still deciding.
+  useLastNotificationResponse: jest.fn().mockReturnValue(null),
+  DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   AndroidImportance: { DEFAULT: 3 },
   SchedulableTriggerInputTypes: { DATE: 'date' },
 }));
