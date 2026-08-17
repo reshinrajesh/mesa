@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 55 component, hook, service and integration tests
+npm run verify     # typecheck + lint + 90 domain checks + 71 component, screen, hook and service tests
 ```
 
 ---
@@ -157,7 +157,16 @@ removed and when it is made unconditional, which is the only evidence worth havi
 
 `notificationService.test.ts` is the third kind: it drives the real service against the real
 AsyncStorage mock, because the pure rules are already proved by the domain checks and what is left
-unproven is whether the service wrote the result back. `useInboxReconciliation.test.tsx` is the
+unproven is whether the service wrote the result back. `src/screens/` is the fourth: whole routes,
+rendered with the providers the app gives them, over the real services and storage. That is the only
+level at which "the bulk clear appears once something has been read", "a waitlist row offers a place
+in the queue rather than directions to a table nobody is holding", and "the Rate action retires once
+you have rated" are facts rather than intentions — each of those is decided by the screen, and none
+of them is visible to a component test or a pure function.
+
+Those files live under `src/` rather than beside the screens because they cannot live beside them:
+expo-router builds its route table from `require.context(app, true, /.*\.[tj]sx?$/)`, so
+`app/notifications.test.tsx` would ship in the bundle as a route called "notifications.test". `useInboxReconciliation.test.tsx` is the
 fourth: the loop that files those rows writes, invalidates the query it just read, and is re-run by
 that invalidation, so what stops it is that the rows it filed are no longer missing. That is a
 convergence argument rather than a guard — the kind of thing that is either right or spins for ever
@@ -410,7 +419,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 55 component, hook, service and HTTP integration tests |
+| `npm test` | 71 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
