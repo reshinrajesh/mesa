@@ -24,7 +24,7 @@ export const Rating = React.memo(function Rating({
   style,
 }: RatingProps) {
   const theme = useTheme();
-  const color = onPhoto ? '#FBF8F4' : theme.colors.star;
+  const color = onPhoto ? theme.colors.onPhoto : theme.colors.star;
 
   return (
     <View
@@ -41,7 +41,7 @@ export const Rating = React.memo(function Rating({
       {count !== undefined ? (
         <Text
           variant="caption"
-          style={{ color: onPhoto ? 'rgba(251,248,244,0.8)' : theme.colors.inkFaint }}
+          style={{ color: onPhoto ? theme.colors.onPhotoMuted : theme.colors.inkFaint }}
         >
           ({formatReviewCount(count)})
         </Text>

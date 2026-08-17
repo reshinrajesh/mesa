@@ -23,6 +23,8 @@ import {
   requireRestaurant,
   LOCK_WINDOW_MS,
 } from '@/features/reservations/rules';
+import { contrastRatio, flatten } from '@/theme/contrast';
+import { palettes } from '@/theme/palette';
 import { config } from '@/constants/config';
 import { emptyFilters, type Reservation, type ReservationStatus } from '@/types';
 import { isAppError, type ErrorCode } from '@/utils/errors';
@@ -774,6 +776,109 @@ check('every cuisine and price tier is represented', () => {
   assert.ok(kinds.size >= 4, `only ${kinds.size} venue kinds`);
   const neighbourhoods = new Set(mockRestaurants.map((r) => r.neighbourhood));
   assert.ok(neighbourhoods.size >= 10, `only ${neighbourhoods.size} neighbourhoods`);
+});
+
+console.log('\n--- contrast ---');
+
+/**
+ * WCAG AA for text below 18pt. Everything in this app that carries information
+ * is below it — the display headings that are not are held to the same floor
+ * anyway, because nothing was gained by exempting them.
+ */
+const TEXT_FLOOR = 4.5;
+
+/** Every ground a foreground can land on. Screens stack up to `surfaceAlt`. */
+const GROUNDS = ['canvas', 'canvasSunk', 'surface', 'surfaceAlt'] as const;
+const SCHEMES = ['light', 'dark'] as const;
+
+/** Reports the number when it fails, since "too low" alone fixes nothing. */
+function assertReadable(label: string, fg: string, bg: string, floor = TEXT_FLOOR) {
+  const ratio = contrastRatio(fg, bg);
+  assert.ok(ratio >= floor, `${label}: ${ratio.toFixed(2)}:1 (${fg} on ${bg}), needs ${floor}:1`);
+}
+
+check('the contrast maths matches the WCAG reference values', () => {
+  assert.equal(Math.round(contrastRatio('#000000', '#FFFFFF')), 21);
+  assert.equal(contrastRatio('#FFFFFF', '#FFFFFF'), 1);
+  // Half-black over white is mid-grey at ~3.98:1. A checker that read the alpha
+  // as opaque would answer 21 here, and would wave through every translucent
+  // token in the palette — which is most of them.
+  assert.equal(flatten('rgba(0,0,0,0.5)', '#FFFFFF'), 'rgba(127.5,127.5,127.5,1)');
+  assert.ok(Math.abs(contrastRatio('rgba(0,0,0,0.5)', '#FFFFFF') - 3.98) < 0.01);
+});
+
+check('every ink tier is readable on every ground, in both schemes', () => {
+  for (const scheme of SCHEMES) {
+    const p = palettes[scheme];
+    for (const fg of ['ink', 'inkMuted', 'inkFaint', 'star'] as const) {
+      for (const bg of GROUNDS) {
+        assertReadable(`${scheme} ${fg} on ${bg}`, p[fg], p[bg]);
+      }
+    }
+  }
+});
+
+check('text on a filled surface is readable, including the muted tier', () => {
+  // `ink` as a fill — the primary button, the next-booking card — inverts
+  // between schemes. This is the pair a hardcoded rgba() cannot survive.
+  for (const scheme of SCHEMES) {
+    const p = palettes[scheme];
+    assertReadable(`${scheme} inkOn on ink`, p.inkOn, p.ink);
+    assertReadable(`${scheme} inkOnMuted on ink`, p.inkOnMuted, p.ink);
+    assertReadable(`${scheme} accentOn on accent`, p.accentOn, p.accent);
+    assertReadable(`${scheme} inkOn on accent`, p.inkOn, p.accent);
+  }
+});
+
+check('the ink tiers stay a hierarchy, not just three passing values', () => {
+  for (const scheme of SCHEMES) {
+    const p = palettes[scheme];
+    const ratio = (c: string) => contrastRatio(c, p.canvas);
+    assert.ok(
+      ratio(p.ink) > ratio(p.inkMuted) && ratio(p.inkMuted) > ratio(p.inkFaint),
+      `${scheme}: raising a tier to clear the floor flattened the hierarchy`,
+    );
+  }
+});
+
+check('every semantic tone survives its own soft fill', () => {
+  // A tone is drawn on a tint of itself, so the fill pulls the ground toward the
+  // foreground: the badge, not the plain label, is the binding case.
+  for (const scheme of SCHEMES) {
+    const p = palettes[scheme];
+    for (const tone of ['positive', 'warning', 'danger', 'accent'] as const) {
+      for (const bg of GROUNDS) {
+        assertReadable(`${scheme} ${tone} on ${bg}`, p[tone], p[bg]);
+        assertReadable(
+          `${scheme} ${tone} on ${tone}Soft over ${bg}`,
+          p[tone],
+          flatten(p[`${tone}Soft`], p[bg]),
+        );
+      }
+    }
+  }
+});
+
+check('anything drawn on a photo survives the brightest possible photo', () => {
+  // A restaurant photo is not a palette value, so the only honest ground to
+  // test against is the worst one: a blown-out white plate under a flash.
+  const WHITE_PLATE = '#FFFFFF';
+  for (const scheme of SCHEMES) {
+    const p = palettes[scheme];
+    const chip = flatten(p.photoChip, WHITE_PLATE);
+    const badge = flatten(p.photoBadge, WHITE_PLATE);
+    // A glyph is a control, not prose: WCAG asks 3:1 of it (1.4.11).
+    assertReadable(`${scheme} glyph on photoChip`, p.onPhoto, chip, 3);
+    assertReadable(`${scheme} text on photoBadge`, p.onPhoto, badge);
+    assertReadable(`${scheme} muted text on photoBadge`, p.onPhotoMuted, badge);
+    // Inverted on purpose: this is why the saved heart is white on photography
+    // rather than terracotta. If a future accent does clear the chip, this fails
+    // and the decision gets revisited instead of quietly outliving its reason.
+    assert.ok(
+      contrastRatio(p.accent, chip) < 3,
+      `${scheme}: the accent now clears a photo chip — FavoriteButton can go back to tinting the saved heart`,
+    );
+  }
 });
 
 console.log(`\n${checks} checks passed\n`);

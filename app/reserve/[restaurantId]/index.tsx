@@ -356,7 +356,7 @@ export default function ReserveScreen() {
                       <Text
                         variant="caption"
                         style={{
-                          color: selected ? 'rgba(253,251,248,0.7)' : theme.colors.inkFaint,
+                          color: selected ? theme.colors.inkOnMuted : theme.colors.inkFaint,
                         }}
                       >
                         {option.hint}

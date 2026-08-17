@@ -91,7 +91,7 @@ export const DateRail = React.memo(function DateRail({
               numberOfLines={1}
               style={{
                 color: selected
-                  ? 'rgba(253,251,248,0.7)'
+                  ? theme.colors.inkOnMuted
                   : entry.isWeekend
                     ? theme.colors.accent
                     : theme.colors.inkFaint,

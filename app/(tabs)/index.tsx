@@ -291,7 +291,7 @@ function NextBookingCard({ reservationIndex }: { reservationIndex: number }) {
 
             <View style={{ flex: 1, padding: theme.spacing.base, gap: 3 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text variant="overline" style={{ color: 'rgba(253,251,248,0.6)' }}>
+                <Text variant="overline" style={{ color: theme.colors.inkOnMuted }}>
                   Your next table
                 </Text>
                 {reservation.status === 'pending' ? (
@@ -303,14 +303,14 @@ function NextBookingCard({ reservationIndex }: { reservationIndex: number }) {
                 {restaurant?.name}
               </Text>
 
-              <Text variant="caption" style={{ color: 'rgba(253,251,248,0.75)' }} numberOfLines={1}>
+              <Text variant="caption" style={{ color: theme.colors.inkOnMuted }} numberOfLines={1}>
                 {formatDateKeyShort(reservation.date)} · {formatTime(reservation.time)} ·{' '}
                 {formatPartySize(reservation.partySize)}
               </Text>
             </View>
 
             <View style={{ paddingRight: theme.spacing.base }}>
-              <Ionicons name="chevron-forward" size={18} color="rgba(253,251,248,0.6)" />
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.inkOnMuted} />
             </View>
           </View>
         </Card>

@@ -38,8 +38,8 @@ export const Badge = React.memo(function Badge({
     warning: { bg: theme.colors.warningSoft, fg: theme.colors.warning },
     danger: { bg: theme.colors.dangerSoft, fg: theme.colors.danger },
     accent: { bg: theme.colors.accentSoft, fg: theme.colors.accent },
-    // Sits on top of photography, so it carries its own opaque ground.
-    onPhoto: { bg: 'rgba(20,15,12,0.72)', fg: '#FBF8F4' },
+    // Sits on top of photography, so it carries its own ground.
+    onPhoto: { bg: theme.colors.photoBadge, fg: theme.colors.onPhoto },
   };
 
   const { bg, fg } = tones[tone];

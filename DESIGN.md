@@ -34,12 +34,16 @@ Light is the primary scheme; dark is a full peer, not a tint pass. Tokens live i
 | `surface` | `#FFFFFF` | `#1E1A17` | Cards and sheets |
 | `ink` | `#1A1613` | `#F4EFE7` | Headings, values, primary button fill |
 | `inkMuted` | `#5D544A` | `#ADA398` | Body copy and metadata |
-| `inkFaint` | `#8E8478` | `#7C736A` | De-emphasised metadata, placeholders |
+| `inkFaint` | `#71695F` | `#92887D` | De-emphasised metadata, placeholders |
 | `hairline` | ink @ 10% | ink @ 12% | Separators and card borders |
-| `accent` | `#C4552F` | `#E0754C` | The one live thing on the screen |
+| `accent` | `#A34727` | `#E4774E` | The one live thing on the screen |
 | `positive` | `#2E6B4C` | `#6FBE92` | Confirmed, open now, available |
-| `warning` | `#9C6414` | `#DFA65E` | Awaiting venue, closing soon, limited |
+| `warning` | `#895912` | `#DFA65E` | Awaiting venue, closing soon, limited |
 | `danger` | `#A93326` | `#E8796B` | Cancelled, no-show, destructive |
+| `photoChip` / `photoBadge` | ink @ 52% / 72% | same | Grounds for a glyph, and for words, on a photo |
+
+The photo grounds are the only tokens identical in both schemes: a photograph does not know which
+theme it landed in. Every value above is the output of the contrast checks in §9, not a swatch.
 
 ### Three rules the palette exists to enforce
 
@@ -221,9 +225,34 @@ Non-negotiable, and enforced in the primitives rather than screen by screen:
 - **Dynamic type**, capped per variant (§3).
 - **Reduce Motion** respected via `useReduceMotion`, wired into `Pressable`, `Skeleton` and the
   wizard's step transitions.
-- **Contrast.** Body text on canvas is ~11:1 light and ~10:1 dark. The dark accent is lifted to
-  `#E0754C` specifically to clear 4.5:1 against `#141110`; the light `#C4552F` clears it against
-  `#FAF7F2`.
+- **Contrast, computed rather than claimed.** This bullet used to promise ~11:1 body text and an
+  accent that cleared 4.5:1. Both were wrong — body copy was 6.9:1, and the light accent was 4.19:1
+  on the canvas, 4.48:1 under the white label of the primary button. Nothing checked, so nothing
+  caught it. `src/theme/contrast.ts` now holds the WCAG formulas and `npm run test:domain` walks
+  every foreground against every ground it can land on, alpha composited, in both schemes:
+
+  | | light | dark |
+  |---|---|---|
+  | Headings (`ink`) | 16.8:1 | 16.4:1 |
+  | Body (`inkMuted`) | 6.9:1 | 7.6:1 |
+  | Metadata and placeholders (`inkFaint`) | 5.1:1 | 5.4:1 |
+  | Accent as text | 5.6:1 | 6.3:1 |
+  | Accent inside its own chip, on the sunk canvas | 4.6:1 | 6.0:1 |
+  | Label on an accent fill | 6.0:1 | 6.3:1 |
+  | Words on a photo badge, over a white plate | 7.3:1 | 7.3:1 |
+  | A glyph on a photo chip, over a white plate | 3.6:1 | 3.6:1 |
+
+  Getting there moved five values. The accent deepened to `#A34727` and the amber to `#895912`; both
+  faint tiers came in; the soft fills dropped to 8% (light) and 10% (dark), because a tone is drawn
+  *on* a tint of itself and every point of alpha pulls the ground toward the foreground. The binding
+  case in the whole app is an accent chip on `canvasSunk` at 4.6:1 — one point of margin, and the
+  reason the terracotta is deeper than it was.
+
+  Two things the arithmetic decided rather than confirmed. The photo chip went from 45% to 52%
+  opacity: a glyph over a bright photo measured 2.9:1, under the 3:1 WCAG asks of a control. And the
+  saved heart is white on photography instead of terracotta, because a chip over a bright photo lands
+  mid-grey and *no* mid-tone accent clears 3:1 there. The state is carried by the glyph filling in,
+  which is the §2 rule anyway: colour never carries meaning alone.
 - **Live regions** on validation errors and toasts.
 - **Decorative images carry an empty label** so a screen reader does not read a filename; the
   container above them carries the real one.

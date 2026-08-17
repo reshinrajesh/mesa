@@ -187,8 +187,10 @@ export default function RestaurantDetailScreen() {
                   style={[
                     styles.dot,
                     {
-                      backgroundColor:
-                        index === galleryIndex ? '#FBF8F4' : 'rgba(251,248,244,0.4)',
+                      backgroundColor: theme.colors.onPhoto,
+                      // Decorative, and duplicated by the gallery's own count —
+                      // so the inactive dots may fade rather than hold 3:1.
+                      opacity: index === galleryIndex ? 1 : 0.4,
                       width: index === galleryIndex ? 16 : 5,
                     },
                   ]}
@@ -447,6 +449,7 @@ function CircleButton({
   label: string;
   onPress: () => void;
 }) {
+  const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
@@ -454,9 +457,9 @@ function CircleButton({
       accessibilityLabel={label}
       hitSlop={8}
       scaleTo={0.88}
-      style={styles.circle}
+      style={[styles.circle, { backgroundColor: theme.colors.photoChip }]}
     >
-      <Ionicons name={icon} size={19} color="#FBF8F4" />
+      <Ionicons name={icon} size={19} color={theme.colors.onPhoto} />
     </Pressable>
   );
 }
@@ -520,7 +523,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(20,15,12,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },

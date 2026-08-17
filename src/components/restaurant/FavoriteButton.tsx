@@ -48,10 +48,20 @@ export const FavoriteButton = React.memo(function FavoriteButton({
   };
 
   const onPhoto = variant === 'onPhoto';
-  const glyphColor = isFavorite
-    ? theme.colors.accent
-    : onPhoto
-      ? '#FBF8F4'
+  /**
+   * On a photo the saved heart is white, not terracotta.
+   *
+   * Not a preference: a chip over a bright photo lands mid-grey, and a mid-grey
+   * ground is the one place a mid-tone accent has nowhere to go — the saved
+   * heart measured 1.6:1 there, well under the 3:1 a control owes the eye. No
+   * terracotta clears it, at any opacity. So on photography the state is carried
+   * by the glyph filling in, which is stronger than a hue anyway and works for
+   * someone who cannot see the hue at all. Off photography the accent stays.
+   */
+  const glyphColor = onPhoto
+    ? theme.colors.onPhoto
+    : isFavorite
+      ? theme.colors.accent
       : theme.colors.inkMuted;
 
   return (
@@ -70,7 +80,7 @@ export const FavoriteButton = React.memo(function FavoriteButton({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: onPhoto ? 'rgba(20,15,12,0.45)' : theme.colors.surface,
+          backgroundColor: onPhoto ? theme.colors.photoChip : theme.colors.surface,
           borderColor: onPhoto ? 'transparent' : theme.colors.hairline,
           borderWidth: onPhoto ? 0 : StyleSheet.hairlineWidth * 2,
         },

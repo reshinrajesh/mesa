@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 63 domain checks + 38 component and integration tests
+npm run verify     # typecheck + lint + 69 domain checks + 38 component and integration tests
 ```
 
 ---
@@ -106,7 +106,7 @@ removed. That is a missing product decision rather than a bug, and it is listed 
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 63 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 69 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -160,7 +160,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 63 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 69 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -305,6 +305,13 @@ Accessibility is built in rather than retrofitted: every pressable is at least 4
 where it renders smaller), every variant carries its own dynamic-type ceiling, no status is signalled
 by colour alone, and Reduce Motion swaps scale animations for opacity.
 
+Contrast is arithmetic rather than assertion. `src/theme/contrast.ts` holds the WCAG formulas and six
+of the domain checks walk every foreground against every ground it can land on — composited, so the
+translucent half of the palette is measured as the eye receives it rather than as it was written.
+That pass moved five palette values and two component decisions; DESIGN.md §9 has the table and the
+before. The two colours still hardcoded are the QR code's black on white, which scanners want, and
+they say so where they are written.
+
 ---
 
 ## Extension points
@@ -331,7 +338,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 63 checks over the pure domain layer |
+| `npm run test:domain` | 69 checks over the pure domain layer and the palette |
 | `npm test` | 38 component and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
