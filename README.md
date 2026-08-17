@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 50 component, service and integration tests
+npm run verify     # typecheck + lint + 90 domain checks + 55 component, hook, service and integration tests
 ```
 
 ---
@@ -157,7 +157,12 @@ removed and when it is made unconditional, which is the only evidence worth havi
 
 `notificationService.test.ts` is the third kind: it drives the real service against the real
 AsyncStorage mock, because the pure rules are already proved by the domain checks and what is left
-unproven is whether the service wrote the result back.
+unproven is whether the service wrote the result back. `useInboxReconciliation.test.tsx` is the
+fourth: the loop that files those rows writes, invalidates the query it just read, and is re-run by
+that invalidation, so what stops it is that the rows it filed are no longer missing. That is a
+convergence argument rather than a guard — the kind of thing that is either right or spins for ever
+filing duplicates — and no pure check can see it. Removing the deduplication, the session gate, the
+boot gate or the wake-up timer each fails exactly one of its five tests.
 
 Note for anyone adding to it: React Native Testing Library 14 made `render` **async** for React 19's
 concurrent renderer. Without `await`, `screen` reports "render function has not been called" while
@@ -405,7 +410,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 50 component, service and HTTP integration tests |
+| `npm test` | 55 component, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
