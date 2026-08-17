@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 87 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 90 domain checks + 98 component, screen, hook and service tests
 ```
 
 ---
@@ -217,7 +217,7 @@ src/
   constants/      config · cuisines and labels · the one query-key factory
   utils/          date · format · geo · errors · storage · haptics · log · id
   mock/           restaurants · menus · reviews · seed · availability · images
-  services/       contracts.ts + one mock implementation per contract
+  services/       contracts.ts + a mock and an HTTP implementation of each
   store/          five Zustand stores, deliberately separate
   hooks/          TanStack Query bindings, one file per domain
   features/       business logic: restaurants · recommendations · search · reservations · notifications
@@ -244,13 +244,11 @@ implementation, so `src/services/index.ts` is the only file that knows which one
 EXPO_PUBLIC_USE_MOCK_SERVICES=false EXPO_PUBLIC_API_BASE_URL=http://localhost:4000 npm start
 ```
 
-Restaurants and reservations are implemented — `restaurantService.http.ts` and
-`reservationService.http.ts`, both against `request()` from `http.ts`, which handles timeout, abort,
-bearer-token injection from SecureStore, and mapping every status onto an `AppError` that already
-carries written copy. Auth, favourites, notifications, reviews and location are still mock-only; they
-are the same exercise and go in the same place, and are absent rather than half-written.
-
-The endpoints those two expect:
+**Every contract has both implementations.** Each `*.http.ts` goes through `request()` from
+`http.ts`, which handles timeout, abort, bearer-token injection from SecureStore, and mapping every
+status onto an `AppError` that already carries written copy. `locationService` is the one exception
+and always will be: it asks the OS for a permission and a coordinate, and no server knows where this
+phone is. It is not missing from the list, it does not belong in it.
 
 | | |
 |---|---|
@@ -260,15 +258,42 @@ The endpoints those two expect:
 | `GET /reservations` · `GET /reservations/:id` | the guest's own, bearer token required |
 | `POST /reservations` · `PATCH /reservations/:id` · `POST /reservations/:id/cancel` | book, change, cancel |
 | `POST /waitlist` · `POST /waitlist/:id/accept` | join a queue, take the table |
+| `POST /auth/sign-in` · `/sign-up` · `/password-reset` · `/otp` · `/otp/verify` · `/provider/:name` | all unauthenticated; each returns `{ user, tokens }` |
+| `POST /auth/sign-out` · `GET /auth/me` · `PATCH /auth/me` | end a session, resolve a token to a profile, edit one |
+| `GET /favorites` · `PUT /favorites/:id` · `DELETE /favorites/:id` | saved ids; `PUT` because saving twice must equal saving once |
+| `GET /restaurants/:id/reviews` · `/reviews/breakdown` · `POST /restaurants/:id/reviews` | reads public, writing carries the token |
+| `GET /notifications` · `POST /notifications` | the inbox, and filing an entry into it |
+| `POST /notifications/:id/read` · `/read-all` · `DELETE /notifications/:id` | read one, read all, dismiss one |
+| `POST /notifications/clear-read` → `{ cleared }` · `POST /notifications/restore` | bulk clear, and undo by sending the entry back whole |
+| `GET` · `PUT /notifications/preferences` · `POST /push/register` | preferences follow the account; the push token is registered against it |
 
 Reads of public data are sent unauthenticated on purpose, so browsing signed-out is the normal path
-rather than a special case. Everything under `/reservations` and `/waitlist` carries the token.
+rather than a special case. Everything else carries the token.
+
+Three decisions are worth knowing before writing the server side. **Sign-out clears the device
+whatever the response is** — a server session outliving the device's is housekeeping, and the reverse
+is a live credential on a phone whose owner has just asked to be signed out. **Notifications are
+split down the middle**: the inbox and the preferences are the server's, because they follow a guest
+to a second device, while permissions and scheduling stay in `notificationDevice.ts` — a reminder for
+tonight's table is fired by the OS from a phone that may be offline by then. That is why the device
+module takes preferences as an argument instead of reading them: it is the one thing the two
+implementations disagree about. And **the token/profile storage split lives in `session.ts`**, shared
+by both auth services, because two copies of that rule would eventually drift, and the drift that
+matters — a token written to plaintext AsyncStorage — is invisible until someone reads a rooted
+device.
 
 **This is tested, not asserted.** `http.integration.test.ts` starts a real `node:http` server, points
 the client at it and calls the actual service methods — a fetch mock would happily confirm a URL no
 server could route and a header that never got sent. It covers the query flattening, the bearer
 token, JSON round-tripping, path encoding, the mock/HTTP switch itself, and that a 409 becomes "That
 time just went" while the provider's `PG::UndefinedTable` reaches the log and never the screen.
+
+It also holds the three decisions above: that a 500 from `/auth/sign-out` still clears the keychain,
+that a dead preferences endpoint still schedules the reminder, and that no write carrying a token
+reaches the plaintext store. And it asserts that both implementations of every contract expose the
+same method names — TypeScript checks that at the seam and stops checking the moment someone reaches
+for `as never`, and a method missing from one side is a screen that works against the mock and throws
+against the server.
 
 One thing the HTTP services deliberately do not do is run `features/reservations/rules.ts`. On a real
 backend those checks are the server's — it owns the table inventory, and a client deciding for itself
@@ -418,7 +443,7 @@ The foundation was built with these in mind. Each is additive:
 
 | Feature | Where it goes |
 |---|---|
-| Real backend | `services/contracts.ts` + `http.ts`, already written |
+| Real backend | `services/*.http.ts`, written and tested against a real socket |
 | Push notifications | `notificationService.registerForPush()`, currently an intentional no-op |
 | Payments, deposits | a new `paymentService` contract; the review screen has the slot for it |
 | Loyalty, offers, coupons | `uiStore` ambient state + a rail on Home |
@@ -437,7 +462,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 87 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 98 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

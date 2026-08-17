@@ -4,17 +4,17 @@ import type { AuthService } from './contracts';
 import { mockUser } from '@/mock/seed';
 import { AppError } from '@/utils/errors';
 import { localId } from '@/utils/id';
-import { secureKeys, secureStorage, storage, storageKeys } from '@/utils/storage';
+import { storage, storageKeys } from '@/utils/storage';
 import { simulate } from './latency';
+import { clearSession, markGuestSession, persistSession, readSession } from './session';
 
 /**
  * Mock authentication.
  *
  * The important part of this file is not the fake sign-in, it is where things
- * are stored. Tokens go to SecureStore (keychain / EncryptedSharedPreferences);
- * the user profile goes to AsyncStorage. When a real identity provider replaces
- * this module, that split must survive — a token in AsyncStorage is readable by
- * anything with filesystem access on a rooted device.
+ * are stored — and that now lives in `./session.ts`, shared with the HTTP
+ * implementation, because the token/profile split is the half that must not
+ * differ between them.
  *
  * The credentials below authenticate against nothing. There is no secret here
  * to leak, which is itself deliberate: a client bundle is not a safe place for
@@ -35,13 +35,6 @@ function mintTokens(): AuthTokens {
   };
 }
 
-async function persist(user: User, tokens: AuthTokens): Promise<void> {
-  await secureStorage.set(secureKeys.accessToken, tokens.accessToken);
-  await secureStorage.set(secureKeys.refreshToken, tokens.refreshToken);
-  await storage.set(storageKeys.user, user);
-  await storage.set(storageKeys.session, 'authenticated');
-}
-
 function maskDestination(destination: string): string {
   if (destination.includes('@')) {
     const [name, domain] = destination.split('@');
@@ -52,17 +45,13 @@ function maskDestination(destination: string): string {
 
 export const authService: AuthService = {
   async restore() {
-    const kind = await storage.get<'authenticated' | 'guest' | 'anonymous'>(
-      storageKeys.session,
-      'anonymous',
-    );
-    if (kind !== 'authenticated') return { user: null, kind };
-
-    const token = await secureStorage.get(secureKeys.accessToken);
-    const user = await storage.get<User | null>(storageKeys.user, null);
-    // A profile without a token is a broken session, not a signed-in one.
-    if (!token || !user) return { user: null, kind: 'anonymous' };
-    return { user, kind: 'authenticated' };
+    const session = await readSession();
+    // The mock has no /auth/me to fall back on, so a session with a token but
+    // no cached profile is not one it can complete.
+    if (session.kind === 'authenticated' && !session.user) {
+      return { user: null, kind: 'anonymous' as const };
+    }
+    return session;
   },
 
   async signIn(email, password) {
@@ -77,7 +66,7 @@ export const authService: AuthService = {
         ? mockUser
         : { ...mockUser, id: localId('usr'), email: email.trim().toLowerCase() };
       const tokens = mintTokens();
-      await persist(user, tokens);
+      await persistSession(user, tokens);
       return { user, tokens };
     }, 900);
   },
@@ -95,7 +84,7 @@ export const authService: AuthService = {
         createdAt: new Date().toISOString(),
       };
       const tokens = mintTokens();
-      await persist(user, tokens);
+      await persistSession(user, tokens);
       return { user, tokens };
     }, 1100);
   },
@@ -123,7 +112,7 @@ export const authService: AuthService = {
         ? { ...mockUser, email: destination.trim().toLowerCase() }
         : { ...mockUser, phone: destination.trim() };
       const tokens = mintTokens();
-      await persist(user, tokens);
+      await persistSession(user, tokens);
       return { user, tokens };
     }, 900);
   },
@@ -136,23 +125,18 @@ export const authService: AuthService = {
         name: provider === 'apple' ? 'Alex M.' : mockUser.name,
       };
       const tokens = mintTokens();
-      await persist(user, tokens);
+      await persistSession(user, tokens);
       return { user, tokens };
     }, 1200);
   },
 
   async continueAsGuest() {
-    await storage.set(storageKeys.session, 'guest');
+    await markGuestSession();
     await simulate(() => undefined, 150);
   },
 
   async signOut() {
-    // Tokens die first. If the process is killed halfway through a sign-out,
-    // the worst outcome should be a stale profile, never a live credential.
-    await secureStorage.remove(secureKeys.accessToken);
-    await secureStorage.remove(secureKeys.refreshToken);
-    await storage.remove(storageKeys.user);
-    await storage.set(storageKeys.session, 'anonymous');
+    await clearSession();
     await simulate(() => undefined, 200);
   },
 

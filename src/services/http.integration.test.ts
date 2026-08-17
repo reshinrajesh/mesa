@@ -6,8 +6,14 @@ import { AddressInfo } from 'node:net';
 
 import { config } from '@/constants/config';
 import { isAppError } from '@/utils/errors';
+import { secureStorage, storage } from '@/utils/storage';
+import { authServiceHttp } from './authService.http';
+import { favoriteServiceHttp } from './favoriteService.http';
+import * as device from './notificationDevice';
+import { notificationServiceHttp } from './notificationService.http';
 import { reservationServiceHttp } from './reservationService.http';
 import { restaurantServiceHttp } from './restaurantService.http';
+import { reviewServiceHttp } from './reviewService.http';
 
 /**
  * The backend seam, over a real socket.
@@ -35,7 +41,34 @@ jest.mock('@/utils/storage', () => ({
   },
   secureKeys: { accessToken: 'mesa.access-token', refreshToken: 'mesa.refresh-token' },
   storage: { get: jest.fn(), set: jest.fn(), remove: jest.fn() },
-  storageKeys: {},
+  // Real key names, because one of the assertions below is about *which*
+  // storage a token ends up in.
+  storageKeys: {
+    user: 'mesa.user',
+    session: 'mesa.session-kind',
+    notifications: 'mesa.notifications',
+    notificationPrefs: 'mesa.notification-prefs',
+  },
+}));
+
+/**
+ * The device half of notifications is mocked out, not exercised.
+ *
+ * It talks to `expo-notifications` and the Android channel API, neither of
+ * which exists in Node — and neither of which is what this file is about. What
+ * *is* about the seam is which preferences the HTTP service hands it, and that
+ * is asserted below.
+ */
+jest.mock('./notificationDevice', () => ({
+  requestPermission: jest.fn().mockResolvedValue(true),
+  scheduleReservationReminder: jest.fn(),
+  cancelReservationReminder: jest.fn(),
+  scheduleWaitlistAlert: jest.fn(),
+  cancelWaitlistAlert: jest.fn(),
+}));
+
+jest.mock('expo-notifications', () => ({
+  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[xyz]' }),
 }));
 
 interface Received {
@@ -87,7 +120,14 @@ afterAll(async () => {
 beforeEach(() => {
   received = [];
   reply = { status: 200, body: {} };
+  jest.clearAllMocks();
+  (secureStorage.get as jest.Mock).mockResolvedValue('test-access-token');
+  (storage.get as jest.Mock).mockResolvedValue(undefined);
 });
+
+/** Everything ever written to the plaintext store, as strings. */
+const plaintextWrites = () =>
+  (storage.set as jest.Mock).mock.calls.map(([key, value]) => `${key}=${JSON.stringify(value)}`);
 
 const lastRequest = () => received[received.length - 1];
 
@@ -213,6 +253,176 @@ describe('reservationServiceHttp', () => {
   });
 });
 
+describe('authServiceHttp', () => {
+  const CREDENTIALS = {
+    user: { id: 'usr_1', name: 'Alex Marques', email: 'alex@example.com' },
+    tokens: { accessToken: 'access-abc', refreshToken: 'refresh-xyz', expiresAt: 1 },
+  };
+
+  it('signs in unauthenticated, and puts the token where a token belongs', async () => {
+    reply = { status: 200, body: CREDENTIALS };
+
+    await authServiceHttp.signIn('  ALEX@Example.com ', 'mesa1234');
+
+    // No stale bearer on a sign-in: a server that sees one has to decide which
+    // identity the request is about, and the usual answer is a confusing 401.
+    expect(lastRequest().authorization).toBeUndefined();
+    expect(lastRequest().body).toEqual({ email: 'alex@example.com', password: 'mesa1234' });
+
+    expect(secureStorage.set).toHaveBeenCalledWith('mesa.access-token', 'access-abc');
+    expect(secureStorage.set).toHaveBeenCalledWith('mesa.refresh-token', 'refresh-xyz');
+
+    // The rule the storage split exists for, asserted rather than trusted:
+    // nothing carrying a token may be written to the plaintext store.
+    for (const write of plaintextWrites()) {
+      expect(write).not.toContain('access-abc');
+      expect(write).not.toContain('refresh-xyz');
+    }
+  });
+
+  it('clears the device even when the server refuses to sign out', async () => {
+    reply = { status: 500, body: { message: 'session service unavailable' } };
+
+    await expect(authServiceHttp.signOut()).resolves.toBeUndefined();
+
+    // A server session outliving the device's is housekeeping. The reverse —
+    // a live credential on a phone whose owner just signed out — is not.
+    expect(secureStorage.remove).toHaveBeenCalledWith('mesa.access-token');
+    expect(secureStorage.remove).toHaveBeenCalledWith('mesa.refresh-token');
+    expect(storage.set).toHaveBeenCalledWith('mesa.session-kind', 'anonymous');
+  });
+
+  it('completes a session from the token when the cached profile is gone', async () => {
+    (storage.get as jest.Mock).mockImplementation(async (key: string) =>
+      key === 'mesa.session-kind' ? 'authenticated' : null,
+    );
+    reply = { status: 200, body: CREDENTIALS.user };
+
+    const session = await authServiceHttp.restore();
+
+    expect(lastRequest().path).toBe('/auth/me');
+    expect(session).toEqual({ user: CREDENTIALS.user, kind: 'authenticated' });
+  });
+
+  it('gives up the session rather than restoring half of one', async () => {
+    (storage.get as jest.Mock).mockImplementation(async (key: string) =>
+      key === 'mesa.session-kind' ? 'authenticated' : null,
+    );
+    reply = { status: 401, body: { message: 'token expired' } };
+
+    const session = await authServiceHttp.restore();
+
+    expect(session).toEqual({ user: null, kind: 'anonymous' });
+    expect(secureStorage.remove).toHaveBeenCalledWith('mesa.access-token');
+  });
+});
+
+describe('favoriteServiceHttp', () => {
+  it('saves idempotently and removes by path', async () => {
+    reply = { status: 200, body: null };
+
+    await favoriteServiceHttp.addFavorite('rst_grano');
+    // PUT, not POST: an optimistic heart can fire twice on a flaky connection,
+    // and saving a restaurant twice has to be the same outcome as once.
+    expect(lastRequest()).toMatchObject({ method: 'PUT', path: '/favorites/rst_grano' });
+
+    await favoriteServiceHttp.removeFavorite('rst/../admin');
+    expect(lastRequest()).toMatchObject({
+      method: 'DELETE',
+      path: '/favorites/rst%2F..%2Fadmin',
+    });
+  });
+});
+
+describe('reviewServiceHttp', () => {
+  it('reads reviews without credentials and writes them with', async () => {
+    reply = { status: 200, body: { items: [], nextCursor: null, total: 0 } };
+    await reviewServiceHttp.getReviews('rst_grano');
+    expect(lastRequest().authorization).toBeUndefined();
+
+    reply = { status: 200, body: { id: 'rev_1' } };
+    await reviewServiceHttp.createReview({
+      restaurantId: 'rst_grano',
+      reservationId: 'rsv_1',
+      rating: 5,
+      body: 'Excellent',
+      highlights: ['food'],
+    });
+
+    const sent = lastRequest();
+    expect(sent.authorization).toBe('Bearer test-access-token');
+    expect(sent.path).toBe('/restaurants/rst_grano/reviews');
+    // The restaurant is in the path and the author is in the token, so neither
+    // is repeated in the body where a client could disagree with them.
+    // The reservation stays: it is which visit is being reviewed, and it is
+    // what lets the server refuse a review of a table nobody sat at.
+    expect(sent.body).toEqual({
+      reservationId: 'rsv_1',
+      rating: 5,
+      body: 'Excellent',
+      highlights: ['food'],
+    });
+  });
+});
+
+describe('notificationServiceHttp', () => {
+  it('takes the cleared count from the server rather than counting locally', async () => {
+    reply = { status: 200, body: { cleared: 3 } };
+
+    // Another device may have read something since this one last looked, so
+    // the toast has to say what actually went, not what this client expected.
+    await expect(notificationServiceHttp.clearRead()).resolves.toBe(3);
+    expect(lastRequest()).toMatchObject({ method: 'POST', path: '/notifications/clear-read' });
+  });
+
+  it('sends the whole entry back so an undo restores rather than re-files', async () => {
+    reply = { status: 200, body: null };
+    const entry = {
+      id: 'ntf_1',
+      kind: 'waitlist-offer' as const,
+      title: 'A table at Osteria Grano',
+      body: '7:30 PM for two just came free.',
+      createdAt: '2026-08-17T10:00:00.000Z',
+      readAt: null,
+    };
+
+    await notificationServiceHttp.restore(entry);
+
+    expect(lastRequest().body).toEqual(entry);
+  });
+
+  it('still schedules a reminder when the preferences endpoint is down', async () => {
+    reply = { status: 500, body: { message: 'preferences service unavailable' } };
+    const reservation = { id: 'rsv_1', date: '2026-08-20', time: '19:30', partySize: 2 };
+
+    await notificationServiceHttp.scheduleReservationReminder(
+      reservation as never,
+      'Osteria Grano',
+    );
+
+    // Booking is exactly when the network is least reliable — a request has
+    // just succeeded, so the connection may be about to drop. Losing the
+    // preference must not cost someone the reminder.
+    expect(device.scheduleReservationReminder).toHaveBeenCalledWith(
+      reservation,
+      'Osteria Grano',
+      expect.objectContaining({ reminders: true }),
+    );
+  });
+
+  it('registers a push token against the account that asked for it', async () => {
+    reply = { status: 200, body: null };
+
+    await expect(notificationServiceHttp.registerForPush()).resolves.toBe(
+      'ExponentPushToken[xyz]',
+    );
+
+    const sent = lastRequest();
+    expect(sent).toMatchObject({ method: 'POST', path: '/push/register' });
+    expect(sent.authorization).toBe('Bearer test-access-token');
+  });
+});
+
 describe('error mapping', () => {
   /** The status a real booking race returns, and the copy the user must see. */
   it.each([
@@ -249,6 +459,24 @@ describe('error mapping', () => {
 });
 
 describe('the switch', () => {
+  /**
+   * Every contract, both ways.
+   *
+   * Listed rather than derived, and that is the point: a seventh service added
+   * to `contracts.ts` and wired into the registry with only one implementation
+   * will not appear here, and the person adding it has to decide consciously
+   * whether it belongs. The one deliberate absence is `locationService`, which
+   * asks the OS where the phone is — there is no server answer to that.
+   */
+  const CONTRACTS = [
+    ['restaurantService', './restaurantService', './restaurantService.http', 'restaurantServiceHttp'],
+    ['reservationService', './reservationService', './reservationService.http', 'reservationServiceHttp'],
+    ['authService', './authService', './authService.http', 'authServiceHttp'],
+    ['favoriteService', './favoriteService', './favoriteService.http', 'favoriteServiceHttp'],
+    ['notificationService', './notificationService', './notificationService.http', 'notificationServiceHttp'],
+    ['reviewService', './reviewService', './reviewService.http', 'reviewServiceHttp'],
+  ] as const;
+
   it('exports the HTTP services when mocks are off, and the mocks when they are on', () => {
     for (const useMockServices of [true, false]) {
       jest.isolateModules(() => {
@@ -256,14 +484,29 @@ describe('the switch', () => {
 
         /* eslint-disable @typescript-eslint/no-require-imports */
         const services = require('./index');
-        const http = require('./reservationService.http');
-        const mock = require('./reservationService');
-        /* eslint-enable @typescript-eslint/no-require-imports */
 
-        expect(services.reservationService).toBe(
-          useMockServices ? mock.reservationService : http.reservationServiceHttp,
-        );
+        for (const [name, mockModule, httpModule, httpExport] of CONTRACTS) {
+          const mock = require(mockModule)[name];
+          const http = require(httpModule)[httpExport];
+          expect(services[name]).toBe(useMockServices ? mock : http);
+        }
+        /* eslint-enable @typescript-eslint/no-require-imports */
       });
     }
+  });
+
+  it('gives every contract the same shape in both implementations', () => {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    for (const [name, mockModule, httpModule, httpExport] of CONTRACTS) {
+      const mock = require(mockModule)[name];
+      const http = require(httpModule)[httpExport];
+
+      // TypeScript checks this at the seam and stops checking the moment
+      // someone reaches for `as never` or a partial mock. A method missing from
+      // one side is a screen that works against the mock and throws against the
+      // server, which is the exact failure the seam exists to prevent.
+      expect(Object.keys(http).sort()).toEqual(Object.keys(mock).sort());
+    }
+    /* eslint-enable @typescript-eslint/no-require-imports */
   });
 });
