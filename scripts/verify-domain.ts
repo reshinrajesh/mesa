@@ -945,7 +945,6 @@ console.log('\n--- inbox reconciliation ---');
 const PREFS = {
   reservationUpdates: true,
   reminders: true,
-  offers: false,
   reminderLeadHours: 3,
 };
 const NAMES = new Map([['rst_grano', 'Osteria Grano']]);
@@ -972,38 +971,76 @@ check('reconciliation files nothing twice', () => {
   assert.deepEqual(missingEntries([booking], already, NAMES, PREFS), []);
 });
 
+/**
+ * An entry whose table is being held *right now*.
+ *
+ * The timings are the app's own: a queue moves every 20 seconds and a hold
+ * lasts 20 minutes, so five minutes after joining at position 1 the table is
+ * offered and the hold is live. An hour would be lapsed — which is what the
+ * first version of these checks used, and why they asserted "one row if the
+ * arithmetic says offered, none otherwise". That phrasing cannot fail: it
+ * re-derives the expectation from the thing under test.
+ */
+const heldNow = (): Reservation => ({
+  ...NOTIFICATION_FIXTURE,
+  ...hoursFromNow(3),
+  status: 'waitlisted',
+  code: undefined,
+  waitlist: { position: 1, joinedAt: new Date(Date.now() - 5 * 60_000).toISOString() },
+});
+
 check('a held table is filed when the hold starts, not when the app opens', () => {
-  const joined = new Date(Date.now() - 60 * 60_000).toISOString();
-  const queued: Reservation = {
-    ...NOTIFICATION_FIXTURE,
-    ...hoursFromNow(3),
-    status: 'waitlisted',
-    code: undefined,
-    waitlist: { position: 1, joinedAt: joined },
+  const queued = heldNow();
+  assert.equal(waitlistStatus(queued)?.state, 'offered', 'the fixture is not actually being held');
+  assert.deepEqual(
+    missingEntries([queued], [], NAMES, PREFS).map((e) => e.kind),
+    ['waitlist-offer'],
+  );
+
+  // Lapsed is not offered: once the hold has run out there is no table to
+  // announce, and a row filed then would send someone to a booking that is gone.
+  const lapsed: Reservation = {
+    ...queued,
+    waitlist: { position: 1, joinedAt: new Date(Date.now() - 60 * 60_000).toISOString() },
   };
-  const offered = waitlistStatus(queued)?.state === 'offered';
-  const filed = missingEntries([queued], [], NAMES, PREFS).map((e) => e.kind);
-  assert.deepEqual(filed, offered ? ['waitlist-offer'] : [], 'the row disagreed with the arithmetic');
+  assert.equal(waitlistStatus(lapsed)?.state, 'lapsed');
+  assert.deepEqual(missingEntries([lapsed], [], NAMES, PREFS), []);
 });
 
 check('turning reminders off silences the inbox too, but never the held table', () => {
   const booking = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(2) };
   assert.deepEqual(missingEntries([booking], [], NAMES, { ...PREFS, reminders: false }), []);
 
-  const queued: Reservation = {
-    ...NOTIFICATION_FIXTURE,
-    ...hoursFromNow(3),
-    status: 'waitlisted',
-    code: undefined,
-    waitlist: { position: 1, joinedAt: new Date(Date.now() - 60 * 60_000).toISOString() },
-  };
-  const quiet = missingEntries([queued], [], NAMES, { ...PREFS, reminders: false });
-  const silenced = missingEntries([queued], [], NAMES, {
-    ...PREFS,
-    reservationUpdates: false,
-  });
-  assert.equal(quiet.length, waitlistStatus(queued)?.state === 'offered' ? 1 : 0);
+  const queued = heldNow();
+  const quiet = missingEntries([queued], [], NAMES, { ...PREFS, reminders: false }).map(
+    (e) => e.kind,
+  );
+  const silenced = missingEntries([queued], [], NAMES, { ...PREFS, reservationUpdates: false });
+  assert.deepEqual(quiet, ['waitlist-offer'], 'reminders off swallowed the held table');
   assert.deepEqual(silenced, [], 'reservationUpdates off still filed a waitlist row');
+});
+
+check('every notification preference changes what the app does', () => {
+  // The check this file was missing. `offers` sat in Settings as a switch the
+  // user could flip, written to storage and read by nothing, because offers
+  // come from a restaurant through a server and there is no server. A control
+  // that controls nothing spends trust that a missing one does not, so it was
+  // removed — and this is what stops the next one shipping.
+  const booking = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(2) };
+  const both = [booking, heldNow()];
+  const baseline = missingEntries(both, [], NAMES, PREFS).map((e) => e.kind);
+
+  const flags: (keyof typeof PREFS)[] = ['reminders', 'reservationUpdates'];
+  for (const flag of flags) {
+    const off = missingEntries(both, [], NAMES, { ...PREFS, [flag]: false }).map((e) => e.kind);
+    assert.notDeepEqual(off, baseline, `turning '${flag}' off changed nothing`);
+  }
+
+  // The one preference that is not a switch still has to be load-bearing.
+  const longerLead = missingEntries(both, [], NAMES, { ...PREFS, reminderLeadHours: 1 }).map(
+    (e) => e.kind,
+  );
+  assert.notDeepEqual(longerLead, baseline, 'the reminder lead made no difference');
 });
 
 check('a rating is asked for once, and not about last year', () => {
@@ -1183,7 +1220,6 @@ check('anything drawn on a photo survives the brightest possible photo', () => {
     // A glyph is a control, not prose: WCAG asks 3:1 of it (1.4.11).
     assertReadable(`${scheme} glyph on photoChip`, p.onPhoto, chip, 3);
     assertReadable(`${scheme} text on photoBadge`, p.onPhoto, badge);
-    assertReadable(`${scheme} muted text on photoBadge`, p.onPhotoMuted, badge);
     // Inverted on purpose: this is why the saved heart is white on photography
     // rather than terracotta. If a future accent does clear the chip, this fails
     // and the decision gets revisited instead of quietly outliving its reason.

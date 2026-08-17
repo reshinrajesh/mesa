@@ -79,15 +79,10 @@ export default function SettingsScreen() {
               },
             }}
           />
-          <Divider />
-          <ListRow
-            label="Offers from restaurants"
-            description="Occasional, and off by default"
-            toggle={{
-              value: preferences?.offers ?? false,
-              onChange: (value) => preferences && update({ ...preferences, offers: value }),
-            }}
-          />
+          {/* "Offers from restaurants" was here, and it did nothing: nothing
+              on the client can send one, so the switch only ever wrote to
+              storage. A control that does not control anything is worse than a
+              missing one, because it spends the user's trust. */}
         </Group>
 
         <Group title="Data">

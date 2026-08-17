@@ -54,7 +54,6 @@ async function rememberScheduled(key: string, identifier: string): Promise<void>
 export const defaultNotificationPreferences: NotificationPreferences = {
   reservationUpdates: true,
   reminders: true,
-  offers: false,
   reminderLeadHours: 3,
 };
 

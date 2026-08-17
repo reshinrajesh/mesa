@@ -12,19 +12,24 @@ export interface RatingProps {
   count?: number;
   /** Star glyph is ink, not accent — the accent is reserved for live state. */
   size?: 'sm' | 'md';
-  onPhoto?: boolean;
   style?: StyleProp<ViewStyle>;
 }
+
+/**
+ * There was an `onPhoto` variant here, drawing the rating in near-white for use
+ * over imagery. No caller ever passed it: every rating in the app sits on paper,
+ * below the photo rather than on it. It went, and `onPhotoMuted` went with it —
+ * a palette token whose only route to the screen was a prop nobody set.
+ */
 
 export const Rating = React.memo(function Rating({
   value,
   count,
   size = 'sm',
-  onPhoto = false,
   style,
 }: RatingProps) {
   const theme = useTheme();
-  const color = onPhoto ? theme.colors.onPhoto : theme.colors.star;
+  const color = theme.colors.star;
 
   return (
     <View
@@ -39,10 +44,7 @@ export const Rating = React.memo(function Rating({
         {formatRating(value)}
       </Text>
       {count !== undefined ? (
-        <Text
-          variant="caption"
-          style={{ color: onPhoto ? theme.colors.onPhotoMuted : theme.colors.inkFaint }}
-        >
+        <Text variant="caption" style={{ color: theme.colors.inkFaint }}>
           ({formatReviewCount(count)})
         </Text>
       ) : null}

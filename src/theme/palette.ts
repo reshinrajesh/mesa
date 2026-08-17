@@ -93,15 +93,13 @@ export interface Palette {
    * know which theme it landed in, so anything drawn over one has to survive the
    * brightest image the kitchen ever plated.
    *
-   * These four were literals scattered across `Badge`, `FavoriteButton`,
-   * `Rating` and the restaurant hero. That is how `photoChip` came to be 45%
-   * opaque — a heart glyph at 2.9:1 over a white plate, under the 3:1 that
-   * WCAG asks of a control you are meant to find and press.
+   * These began as literals scattered across `Badge`, `FavoriteButton` and the
+   * restaurant hero. That is how `photoChip` came to be 45% opaque — a heart
+   * glyph at 2.9:1 over a white plate, under the 3:1 that WCAG asks of a
+   * control you are meant to find and press.
    */
   /** Foreground on any photo ground below. */
   onPhoto: string;
-  /** Secondary foreground. Only legible on `photoBadge`, never on bare imagery. */
-  onPhotoMuted: string;
   /** Ground for a glyph sitting on an image: circle buttons, the heart. */
   photoChip: string;
   /** Ground for *words* on an image. Darker, because text asks for 4.5:1. */
@@ -153,7 +151,6 @@ export const lightPalette: Palette = {
   scrim: 'rgba(26,22,19,0.42)',
 
   onPhoto: '#FBF8F4',
-  onPhotoMuted: 'rgba(251,248,244,0.80)',
   photoChip: 'rgba(20,15,12,0.52)',
   photoBadge: 'rgba(20,15,12,0.72)',
 
@@ -200,7 +197,6 @@ export const darkPalette: Palette = {
 
   // Deliberately the same values as the light scheme — see the interface.
   onPhoto: '#FBF8F4',
-  onPhotoMuted: 'rgba(251,248,244,0.80)',
   photoChip: 'rgba(20,15,12,0.52)',
   photoBadge: 'rgba(20,15,12,0.72)',
 

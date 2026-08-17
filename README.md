@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 89 domain checks + 50 component, service and integration tests
+npm run verify     # typecheck + lint + 90 domain checks + 50 component, service and integration tests
 ```
 
 ---
@@ -44,6 +44,14 @@ Restaurant-owner tooling, payments and deposits — all out of scope for v1 and 
 in the extension points. Photo upload on the profile screen is absent rather than present-and-dead,
 because storing a file needs a server. Adding a saved address is read-only for the same reason:
 address search needs a keyed geocoding API.
+
+The same rule caught two things that had already shipped. Settings offered a switch called "Offers
+from restaurants" that was written to storage and read by nothing — offers come from a restaurant
+through a server, and there is no server, so the only honest thing the client could do with the
+preference was store it. And `Rating` carried an `onPhoto` variant for use over imagery that no
+caller ever passed, which in turn was the only route to a palette token. Both are gone. A control
+that controls nothing spends trust that a missing one does not, and a check now asserts that every
+remaining notification preference changes what the app files.
 
 ---
 
@@ -126,7 +134,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 89 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 90 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -195,7 +203,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 89 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 90 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -396,7 +404,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 89 checks over the pure domain layer and the palette |
+| `npm run test:domain` | 90 checks over the pure domain layer and the palette |
 | `npm test` | 50 component, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |

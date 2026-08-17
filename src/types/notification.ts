@@ -23,10 +23,20 @@ export interface AppNotification {
   reservationId?: string;
 }
 
+/**
+ * Every field here gates something the app actually does.
+ *
+ * `offers` used to sit alongside these — a switch in Settings, written to
+ * storage, read by nothing. Offers arrive from a restaurant through a server,
+ * and there is no server, so the only honest thing the client could do with the
+ * preference was store it. It follows the same rule as photo upload: absent
+ * rather than present-and-dead, and it comes back the day something can honour
+ * it. A domain check now asserts that each remaining switch changes what the
+ * app files, so the next dead one fails the suite rather than shipping.
+ */
 export interface NotificationPreferences {
   reservationUpdates: boolean;
   reminders: boolean;
-  offers: boolean;
   /** Hours before the booking to fire the local reminder. */
   reminderLeadHours: number;
 }
