@@ -9,10 +9,16 @@ import type {
 } from '@/types';
 
 import { queryKeys } from '@/constants/queryKeys';
+import {
+  bookingCancelled,
+  bookingConfirmed,
+  bookingModified,
+  waitlistJoined,
+} from '@/features/notifications/events';
 import { restaurantById } from '@/mock/restaurants';
 import { notificationService, reservationService } from '@/services';
 import { waitlistStatus, type WaitlistStatus } from '@/features/reservations/waitlist';
-import { combine, formatTime } from '@/utils/date';
+import { combine } from '@/utils/date';
 import { toAppError } from '@/utils/errors';
 import { haptics } from '@/utils/haptics';
 import { toast } from '@/store/uiStore';
@@ -85,6 +91,11 @@ export function useCreateReservation() {
       const restaurant = restaurantById.get(reservation.restaurantId);
       if (restaurant) {
         void notificationService.scheduleReservationReminder(reservation, restaurant.name);
+        // Booking a table filed nothing in the inbox, while taking one off the
+        // waitlist filed a confirmation — so the same outcome left a record or
+        // no record depending on how it was reached.
+        void notificationService.record(bookingConfirmed(reservation, restaurant.name));
+        await client.invalidateQueries({ queryKey: queryKeys.notifications.all });
       }
     },
     onError: (error) => {
@@ -109,6 +120,8 @@ export function useUpdateReservation() {
         // Reschedule rather than leave a reminder pointing at the old sitting.
         await notificationService.cancelReservationReminder(reservation.id);
         void notificationService.scheduleReservationReminder(reservation, restaurant.name);
+        void notificationService.record(bookingModified(reservation, restaurant.name));
+        await client.invalidateQueries({ queryKey: queryKeys.notifications.all });
       }
       toast({ title: 'Booking updated', message: 'The restaurant has been told.', tone: 'positive' });
     },
@@ -135,14 +148,7 @@ export function useJoinWaitlist() {
       // Two separate promises, deliberately. The inbox row is the record that
       // the guest joined; the scheduled alert is the only thing that reaches
       // them once the app is closed, which is exactly when the table frees.
-      void notificationService.record({
-        kind: 'waitlist-joined',
-        title: `On the list at ${restaurant.name}`,
-        body: `${formatTime(entry.time)} for ${entry.partySize}. We will tell you the moment a table frees.`,
-        href: `/reservation/${entry.id}`,
-        restaurantId: entry.restaurantId,
-        reservationId: entry.id,
-      });
+      void notificationService.record(waitlistJoined(entry, restaurant.name));
       await client.invalidateQueries({ queryKey: queryKeys.notifications.all });
 
       const status = waitlistStatus(entry);
@@ -177,16 +183,7 @@ export function useAcceptWaitlistOffer() {
         // the ordinary pre-sitting reminder instead.
         await notificationService.cancelWaitlistAlert(reservation.id);
         void notificationService.scheduleReservationReminder(reservation, restaurant.name);
-        void notificationService.record({
-          kind: 'reservation-confirmed',
-          title: `${restaurant.name} is holding your table`,
-          body: `${formatTime(reservation.time)} for ${reservation.partySize}.${
-            reservation.code ? ` Your code is ${reservation.code}.` : ''
-          }`,
-          href: `/reservation/${reservation.id}`,
-          restaurantId: reservation.restaurantId,
-          reservationId: reservation.id,
-        });
+        void notificationService.record(bookingConfirmed(reservation, restaurant.name));
         await client.invalidateQueries({ queryKey: queryKeys.notifications.all });
       }
 
@@ -272,6 +269,15 @@ export function useCancelReservation() {
     onSuccess: async (reservation, { waitlisted }) => {
       await notificationService.cancelReservationReminder(reservation.id);
       await notificationService.cancelWaitlistAlert(reservation.id);
+
+      const restaurant = restaurantById.get(reservation.restaurantId);
+      if (restaurant) {
+        // Filed even though the user did this themselves and watched it happen:
+        // the row is what the inbox is for the day they wonder whether the
+        // cancellation actually went through.
+        void notificationService.record(bookingCancelled(reservation, restaurant.name));
+        await client.invalidateQueries({ queryKey: queryKeys.notifications.all });
+      }
       toast(
         waitlisted
           ? {

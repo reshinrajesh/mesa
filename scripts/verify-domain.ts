@@ -23,6 +23,13 @@ import {
   requireRestaurant,
   LOCK_WINDOW_MS,
 } from '@/features/reservations/rules';
+import {
+  notificationEvents,
+  waitlistJoined,
+  waitlistOffered,
+  SERVER_ONLY_KINDS,
+} from '@/features/notifications/events';
+import { missingEntries, nextDueAt } from '@/features/notifications/reconcile';
 import { routeFor } from '@/features/notifications/routing';
 import {
   clearRead as clearReadNotifications,
@@ -37,6 +44,7 @@ import { config } from '@/constants/config';
 import {
   emptyFilters,
   type AppNotification,
+  type NotificationKind,
   type Reservation,
   type ReservationStatus,
 } from '@/types';
@@ -863,6 +871,163 @@ check('undo puts an entry back where it was, not at the top', () => {
   );
   // Undo pressed twice must not duplicate the row.
   assert.equal(restoreNotification(after, middle).length, 3);
+});
+
+console.log('\n--- what the inbox can say ---');
+
+const NOTIFICATION_FIXTURE: Reservation = {
+  id: 'rsv_fix',
+  code: 'ABC234',
+  restaurantId: 'rst_grano',
+  date: todayKey(),
+  time: '19:30',
+  partySize: 2,
+  seating: 'any',
+  occasion: 'none',
+  notes: '',
+  status: 'confirmed',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+check('every notification kind the inbox draws is one something can produce', () => {
+  // The same audit the reservation statuses got, and it found the same thing.
+  // `waitlist-offer` — a table held for twenty minutes, the most time-critical
+  // row in the app — had an icon, copy and a place in the union, and nothing
+  // anywhere could file one. Neither could `reservation-modified`.
+  const producible = new Set<NotificationKind>();
+  for (const build of Object.values(notificationEvents)) {
+    producible.add(build(NOTIFICATION_FIXTURE, 'Osteria Grano').kind);
+  }
+  for (const seeded of seedNotifications()) producible.add(seeded.kind);
+  for (const kind of SERVER_ONLY_KINDS) producible.add(kind);
+
+  const drawn: NotificationKind[] = [
+    'reservation-confirmed',
+    'reservation-reminder',
+    'reservation-modified',
+    'reservation-cancelled',
+    'upcoming-reservation',
+    'rating-request',
+    'restaurant-offer',
+    'waitlist-joined',
+    'waitlist-offer',
+  ];
+  for (const kind of drawn) {
+    assert.ok(producible.has(kind), `nothing can produce '${kind}', but the inbox draws it`);
+  }
+});
+
+check('a waitlist row never prints a booking code', () => {
+  // The rule the reservation itself already follows: there is no table yet, and
+  // a code in the inbox is something to present at a door that is not expecting
+  // you. The offer row outlives the twenty-minute hold, so it must not read as
+  // a confirmation either.
+  const queued: Reservation = { ...NOTIFICATION_FIXTURE, status: 'waitlisted', code: undefined };
+  for (const build of [waitlistJoined, waitlistOffered]) {
+    const entry = build(queued, 'Osteria Grano');
+    assert.ok(!entry.body.includes('code'), `${entry.kind} offered a code`);
+    assert.ok(!/confirmed|booked/i.test(entry.body), `${entry.kind} read as a booking`);
+  }
+});
+
+check('every entry the app files leads back to the thing it is about', () => {
+  for (const build of Object.values(notificationEvents)) {
+    const entry = build(NOTIFICATION_FIXTURE, 'Osteria Grano');
+    assert.equal(entry.reservationId, NOTIFICATION_FIXTURE.id, `${entry.kind} lost its reservation`);
+    assert.ok(routeFor(entry), `${entry.kind} leads nowhere`);
+    assert.ok(entry.title.length > 0 && entry.body.length > 0, `${entry.kind} is blank`);
+  }
+});
+
+console.log('\n--- inbox reconciliation ---');
+
+const PREFS = {
+  reservationUpdates: true,
+  reminders: true,
+  offers: false,
+  reminderLeadHours: 3,
+};
+const NAMES = new Map([['rst_grano', 'Osteria Grano']]);
+const hoursFromNow = (hours: number) => {
+  const at = new Date(Date.now() + hours * 3_600_000);
+  return { date: toDateKey(at), time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
+};
+
+check('a sitting is announced once as tomorrow and once as now-ish, never both', () => {
+  const far = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(20) };
+  const near = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(2) };
+
+  const early = missingEntries([far], [], NAMES, PREFS).map((e) => e.kind);
+  assert.deepEqual(early, ['upcoming-reservation'], 'the day-before nudge did not fire alone');
+
+  const late = missingEntries([near], [], NAMES, PREFS).map((e) => e.kind);
+  assert.deepEqual(late, ['reservation-reminder'], '"tomorrow" fired two hours before the table');
+});
+
+check('reconciliation files nothing twice', () => {
+  const booking = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(2) };
+  const [entry] = missingEntries([booking], [], NAMES, PREFS);
+  const already: AppNotification[] = [{ ...entry, id: 'n1', createdAt: '', readAt: null }];
+  assert.deepEqual(missingEntries([booking], already, NAMES, PREFS), []);
+});
+
+check('a held table is filed when the hold starts, not when the app opens', () => {
+  const joined = new Date(Date.now() - 60 * 60_000).toISOString();
+  const queued: Reservation = {
+    ...NOTIFICATION_FIXTURE,
+    ...hoursFromNow(3),
+    status: 'waitlisted',
+    code: undefined,
+    waitlist: { position: 1, joinedAt: joined },
+  };
+  const offered = waitlistStatus(queued)?.state === 'offered';
+  const filed = missingEntries([queued], [], NAMES, PREFS).map((e) => e.kind);
+  assert.deepEqual(filed, offered ? ['waitlist-offer'] : [], 'the row disagreed with the arithmetic');
+});
+
+check('turning reminders off silences the inbox too, but never the held table', () => {
+  const booking = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(2) };
+  assert.deepEqual(missingEntries([booking], [], NAMES, { ...PREFS, reminders: false }), []);
+
+  const queued: Reservation = {
+    ...NOTIFICATION_FIXTURE,
+    ...hoursFromNow(3),
+    status: 'waitlisted',
+    code: undefined,
+    waitlist: { position: 1, joinedAt: new Date(Date.now() - 60 * 60_000).toISOString() },
+  };
+  const quiet = missingEntries([queued], [], NAMES, { ...PREFS, reminders: false });
+  const silenced = missingEntries([queued], [], NAMES, {
+    ...PREFS,
+    reservationUpdates: false,
+  });
+  assert.equal(quiet.length, waitlistStatus(queued)?.state === 'offered' ? 1 : 0);
+  assert.deepEqual(silenced, [], 'reservationUpdates off still filed a waitlist row');
+});
+
+check('a rating is asked for once, and not about last year', () => {
+  const yesterday = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(-20), status: 'completed' as const };
+  assert.deepEqual(
+    missingEntries([yesterday], [], NAMES, PREFS).map((e) => e.kind),
+    ['rating-request'],
+  );
+
+  const rated = { ...yesterday, reviewId: 'rev_1' };
+  assert.deepEqual(missingEntries([rated], [], NAMES, PREFS), [], 'asked for a rating twice');
+
+  const ancient = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(-24 * 30), status: 'completed' as const };
+  assert.deepEqual(missingEntries([ancient], [], NAMES, PREFS), [], 'asked about a month-old dinner');
+});
+
+check('the next wake-up is the next transition, not a poll interval', () => {
+  const booking = { ...NOTIFICATION_FIXTURE, ...hoursFromNow(20) };
+  const due = nextDueAt([booking], PREFS);
+  assert.ok(due !== null, 'nothing to wake for, with a booking 20 hours out');
+  const sitting = combine(booking.date, booking.time).getTime();
+  // Twenty hours out, the next thing to happen is the reminder at lead time.
+  assert.equal(due, sitting - PREFS.reminderLeadHours * 3_600_000);
+  assert.equal(nextDueAt([], PREFS), null, 'a guest with no bookings still set a timer');
 });
 
 console.log('\n--- notification routing ---');

@@ -14,6 +14,7 @@ export const KIND_ICON: Record<NotificationKind, keyof typeof Ionicons.glyphMap>
   'reservation-modified': 'create-outline',
   'reservation-cancelled': 'close-circle-outline',
   'upcoming-reservation': 'calendar-outline',
+  'rating-request': 'star-outline',
   'restaurant-offer': 'pricetag-outline',
   'waitlist-joined': 'hourglass-outline',
   'waitlist-offer': 'restaurant-outline',

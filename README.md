@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 80 domain checks + 42 component and integration tests
+npm run verify     # typecheck + lint + 89 domain checks + 42 component and integration tests
 ```
 
 ---
@@ -79,6 +79,16 @@ settled a booking after its evening, so `completed` came only from the seed — 
 rating flow was unreachable for any booking a real user made, and the profile's "visited" count could
 never rise above two. All three are fixed; this table is how the rest stays honest.
 
+The same audit run over `NotificationKind` found the same thing again. Eight kinds shipped with an
+icon and copy; two could be produced by anything the app did. `waitlist-offer` — a table held for
+twenty minutes, the most time-critical row in Mesa — could be produced by nothing at all, not even
+the seed, and neither could `reservation-modified`. Booking a table filed no inbox row while
+accepting one off the waitlist did, so the same outcome left a record or no record depending on the
+route taken. And one seeded row read "How was Blue Fig? A rating helps the next person decide" under
+the kind `reservation-reminder` and an alarm-clock icon, because there was no kind for what it was —
+so nothing in the app had ever asked anyone to rate anything. All of that is fixed, and a check now
+asserts that every kind the inbox can draw is one something can produce.
+
 | State | How to reach it |
 |---|---|
 | Every `ErrorState` (Home, Explore, Bookings, restaurant, menu) | `EXPO_PUBLIC_MOCK_FAILURE_RATE=0.35 npm start` |
@@ -92,6 +102,8 @@ never rise above two. All three are fixed; this table is how the rest stays hone
 | Sold out, waitlist offered | an evening at a popular venue — ~2% of nights entirely, 10–25% at peak |
 | Waitlist queued → offered → lapsed | the seeded entry, within a minute of first launch |
 | A tapped notification opening what it is about | tap the waitlist alert, from the lock screen or a cold start |
+| Every notification kind | book, change and cancel a table; the rest arrive on their own |
+| A rating request | four hours after a booking of your own, if you have not rated it |
 | `no-show` | seeded, in Past bookings |
 | `completed` and the Rate action | any booking of your own, four hours after its sitting |
 | Two-hour change lock | book today's earliest slot, then open the booking |
@@ -114,7 +126,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 80 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 89 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -168,7 +180,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 80 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 89 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -274,6 +286,17 @@ three lines, and the offer path can be tested at the millisecond before the hold
 waiting twenty minutes. It is also what lets the same rules run against a real backend's
 availability instead of the mock's.
 
+**The inbox reconciles, it does not listen.** Half the inbox is about a moment passing rather than
+about something the guest did: a table coming free, a sitting drawing near, an evening ending. None
+of those can file a row when they happen, because the app is closed when they happen. So nothing
+tries. `features/notifications/reconcile.ts` is given the bookings, the inbox as it stands and the
+clock, and returns what should already be there — the same shape as the waitlist's arithmetic, and
+idempotent by construction, since an entry is "missing" only while the inbox holds nothing like it.
+Backgrounding the app cannot make it miss an event, and the wake-up is a timer set to the exact
+instant of the next transition rather than a poll, because `nextDueAt` already knows when that is.
+Six checks walk a booking from "tomorrow" through "in three hours" to "how was it?" without a
+renderer, a timer or a real calendar.
+
 **A notification decides nothing about where it goes.** Every alert the app schedules carries an
 `href`, and for a while nothing read it — tapping "a table just came free, confirm before the hold
 runs out" opened the app wherever it happened to be, which is the one notification in Mesa with a
@@ -358,7 +381,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 80 checks over the pure domain layer and the palette |
+| `npm run test:domain` | 89 checks over the pure domain layer and the palette |
 | `npm test` | 42 component and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |

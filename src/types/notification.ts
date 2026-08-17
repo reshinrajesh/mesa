@@ -4,6 +4,7 @@ export type NotificationKind =
   | 'reservation-modified'
   | 'reservation-cancelled'
   | 'upcoming-reservation'
+  | 'rating-request'
   | 'restaurant-offer'
   | 'waitlist-joined'
   | 'waitlist-offer';

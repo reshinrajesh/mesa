@@ -19,6 +19,7 @@ import {
   SmartImage,
   Text,
 } from '@/components/ui';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useRestaurantCollections } from '@/hooks/useRestaurants';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { useReservations } from '@/hooks/useReservations';
@@ -52,6 +53,7 @@ export default function HomeScreen() {
 
   const collections = useRestaurantCollections();
   const { upcoming } = useReservations();
+  const { unreadCount } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
 
   const pool = collections.data?.recommended ?? [];
@@ -127,7 +129,14 @@ export default function HomeScreen() {
             <Pressable
               onPress={() => router.push('/notifications')}
               accessibilityRole="button"
-              accessibilityLabel="Notifications"
+              // The count belongs in the label, not only in a dot: a dot is
+              // "something happened" to anyone who can see it and nothing at
+              // all to anyone who cannot.
+              accessibilityLabel={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : 'Notifications, none unread'
+              }
               hitSlop={10}
               scaleTo={0.88}
               style={[
@@ -136,6 +145,16 @@ export default function HomeScreen() {
               ]}
             >
               <Ionicons name="notifications-outline" size={19} color={theme.colors.ink} />
+              {unreadCount > 0 ? (
+                // Ringed in the canvas colour so it reads as a dot on the bell
+                // rather than a smudge where it overlaps the button's edge.
+                <View
+                  style={[
+                    styles.unreadDot,
+                    { backgroundColor: theme.colors.accent, borderColor: theme.colors.canvas },
+                  ]}
+                />
+              ) : null}
             </Pressable>
           </View>
 
@@ -340,6 +359,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: 7,
+    right: 8,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 2,
   },
   searchBar: {
     flexDirection: 'row',

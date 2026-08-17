@@ -220,7 +220,7 @@ export function seedNotifications(): AppNotification[] {
     },
     {
       id: 'ntf_4',
-      kind: 'reservation-reminder',
+      kind: 'rating-request',
       title: 'How was Blue Fig?',
       body: 'You dined there last week. A rating helps the next person decide.',
       createdAt: iso(72),
