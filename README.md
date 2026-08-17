@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 71 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 90 domain checks + 77 component, screen, hook and service tests
 ```
 
 ---
@@ -290,6 +290,13 @@ to change the party size unwinds everything after it. It is a wizard in one scre
 steps backwards, hardware back does the same, and the review screen's rows jump straight to the step
 that set them. Filters and cancel are likewise a sheet and a dialog rather than routes.
 
+That decision exists only as behaviour — a `back()` that returns false looks identical to one that
+navigates — so `src/screens/reserve.test.tsx` holds it: back walks the wizard backwards without the
+router being touched, and only leaves once there is no step behind it. It also holds the two rules
+about the progress bar, which are easy to lose: you may jump back to a step you have answered, and
+the segments ahead of you are `disabled` rather than merely unstyled, so a screen reader is told
+instead of finding out by pressing.
+
 **Availability is deterministic.** `src/mock/availability.ts` seeds every slot from
 `(restaurant, date, party size, time)`, so refetching does not reshuffle the board under the user
 and the "that time just went" path is testable. The mock enforces the same rules the server will:
@@ -419,7 +426,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 71 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 77 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
