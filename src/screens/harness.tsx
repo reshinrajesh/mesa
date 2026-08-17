@@ -1,11 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import React from 'react';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 import type { AppNotification, Reservation } from '@/types';
 
+import { config } from '@/constants/config';
 import { useAuthStore } from '@/store/authStore';
 import { storageKeys } from '@/utils/storage';
 
@@ -37,18 +38,39 @@ const clients: QueryClient[] = [];
 /**
  * Importing this module opts a suite into its cleanup, deliberately.
  *
- * A screen leaves queries in flight — the mock services answer after 180–520ms
- * — and a `QueryClient` with live subscriptions keeps the whole run alive well
- * past the assertions: before this hook existed, a suite whose tests took
- * eleven seconds took minutes to exit. Cancelling and dropping each client at
- * the end of its own test is what fixes that.
+ * Two separate problems, and the second one is not cosmetic.
  *
- * What it does not fix is the `act(...)` warnings from `VirtualizedList`'s own
- * render timer, which reschedules after teardown. A settling delay here was
- * tried and measured: same thirteen warnings, six seconds a suite slower. It is
- * not here because it bought nothing.
+ * A `QueryClient` with live subscriptions keeps the whole run alive well past
+ * the assertions: before this hook existed, a suite whose tests took eleven
+ * seconds took minutes to exit. Dropping each client at the end of its own test
+ * fixes that.
+ *
+ * The draining is the important half. A test that ends while a refetch and a
+ * sheet's closing animation are still in flight leaves an `act()` open, and the
+ * next `render` starts another one on top of it — "overlapping act() calls",
+ * after which the renderer wedges and *every later test in the file renders
+ * nothing*. It presents as three tests that pass alone and fail together, which
+ * is a long afternoon if you go looking for it in the screen.
+ *
+ * So: outlast the longest timer a screen can still be holding, then wait for
+ * whatever fetch that timer started, and only then take the tree away. The
+ * order matters — draining first and waiting second let the search debounce
+ * fire into an unmounted tree, which is exactly the wedge described above.
  */
 afterEach(async () => {
+  await act(async () => {
+    // Search is debounced, and the timer is armed on mount whether or not
+    // anyone types. Taken from the app's own config rather than a number that
+    // happens to be bigger today: a 250ms wait against a 280ms debounce is a
+    // suite that fails in a way nobody will connect to this line.
+    await new Promise((resolve) => setTimeout(resolve, config.searchDebounceMs + 120));
+
+    const deadline = Date.now() + 3_000;
+    while (clients.some((client) => client.isFetching() > 0) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  });
+
   for (const client of clients) {
     client.cancelQueries();
     client.unmount();

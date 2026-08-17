@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 83 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 90 domain checks + 87 component, screen, hook and service tests
 ```
 
 ---
@@ -166,7 +166,18 @@ of them is visible to a component test or a pure function.
 
 Those files live under `src/` rather than beside the screens because they cannot live beside them:
 expo-router builds its route table from `require.context(app, true, /.*\.[tj]sx?$/)`, so
-`app/notifications.test.tsx` would ship in the bundle as a route called "notifications.test". `useInboxReconciliation.test.tsx` is the
+`app/notifications.test.tsx` would ship in the bundle as a route called "notifications.test".
+
+One screen fought back and is worth warning about. Explore can only be rendered a few times per Jest
+module: past that the renderer stops producing output altogether, the next render returns an empty
+tree, every query waits out its timeout — twenty seconds proves it is a wedge rather than slowness —
+and every test after it fails identically whatever it asserts. It is preceded by "overlapping act()
+calls", and none of the usual answers touch it: awaiting the dismissing press, waiting for the sheet
+to leave the tree, draining the query client, outlasting the search debounce, disposing the client,
+reordering. The screen carries a `FlashList` and a map, and one of them holds something across
+unmounts. Its tests are split across two files as a workaround, and one branch — the empty-list copy,
+which changes depending on whether filters are to blame — is currently untested for that reason
+rather than by choice. `useInboxReconciliation.test.tsx` is the
 fourth: the loop that files those rows writes, invalidates the query it just read, and is re-run by
 that invalidation, so what stops it is that the rows it filed are no longer missing. That is a
 convergence argument rather than a guard — the kind of thing that is either right or spins for ever
@@ -426,7 +437,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 83 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 87 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
