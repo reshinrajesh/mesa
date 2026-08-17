@@ -23,10 +23,22 @@ import {
   requireRestaurant,
   LOCK_WINDOW_MS,
 } from '@/features/reservations/rules';
+import {
+  clearRead as clearReadNotifications,
+  dismiss as dismissNotification,
+  expire,
+  readCount,
+  restore as restoreNotification,
+} from '@/features/notifications/inbox';
 import { contrastRatio, flatten } from '@/theme/contrast';
 import { palettes } from '@/theme/palette';
 import { config } from '@/constants/config';
-import { emptyFilters, type Reservation, type ReservationStatus } from '@/types';
+import {
+  emptyFilters,
+  type AppNotification,
+  type Reservation,
+  type ReservationStatus,
+} from '@/types';
 import { isAppError, type ErrorCode } from '@/utils/errors';
 import {
   addDaysToKey,
@@ -776,6 +788,80 @@ check('every cuisine and price tier is represented', () => {
   assert.ok(kinds.size >= 4, `only ${kinds.size} venue kinds`);
   const neighbourhoods = new Set(mockRestaurants.map((r) => r.neighbourhood));
   assert.ok(neighbourhoods.size >= 10, `only ${neighbourhoods.size} neighbourhoods`);
+});
+
+console.log('\n--- inbox ---');
+
+/** Minimal entry: only the fields the retention policy actually reads. */
+function entry(id: string, createdAt: string, readAt: string | null): AppNotification {
+  return {
+    id,
+    kind: 'reservation-reminder',
+    title: id,
+    body: '',
+    createdAt,
+    readAt,
+  };
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+const NOW = new Date('2026-08-17T12:00:00.000Z');
+const ago = (days: number) => new Date(NOW.getTime() - days * DAY).toISOString();
+
+check('retention drops read entries past the window and keeps the rest', () => {
+  const items = [
+    entry('fresh-read', ago(2), ago(1)),
+    entry('stale-read', ago(400), ago(90)),
+    entry('boundary', ago(400), ago(30)),
+  ];
+  const kept = expire(items, NOW).map((n) => n.id);
+  assert.deepEqual(kept, ['fresh-read']);
+  // The boundary goes: at exactly the window it has had its full thirty days.
+  assert.equal(expire(items, NOW, 31 * DAY).length, 2);
+});
+
+check('an unread entry never expires, however old', () => {
+  const ancient = [entry('unread', ago(3650), null)];
+  assert.equal(expire(ancient, NOW).length, 1, 'age removed something nobody had seen');
+});
+
+check('retention counts from when it was read, not when it arrived', () => {
+  // A year-old notification opened yesterday is one you have dealt with
+  // recently; the policy has to say the same thing.
+  const items = [entry('old-but-just-read', ago(365), ago(1))];
+  assert.equal(expire(items, NOW).length, 1);
+});
+
+check('dismiss removes exactly one entry, read or not', () => {
+  const items = [entry('a', ago(1), null), entry('b', ago(2), ago(1)), entry('c', ago(3), null)];
+  assert.deepEqual(
+    dismissNotification(items, 'a').map((n) => n.id),
+    ['b', 'c'],
+  );
+  assert.deepEqual(dismissNotification(items, 'absent').length, 3);
+});
+
+check('clearing read entries cannot take an unread one', () => {
+  const items = [entry('read', ago(1), ago(1)), entry('unread', ago(2), null)];
+  assert.deepEqual(
+    clearReadNotifications(items).map((n) => n.id),
+    ['unread'],
+  );
+  assert.equal(readCount(items), 1);
+});
+
+check('undo puts an entry back where it was, not at the top', () => {
+  const older = entry('older', ago(5), null);
+  const newest = entry('newest', ago(1), null);
+  const middle = entry('middle', ago(3), null);
+  const after = restoreNotification([newest, older], middle);
+  assert.deepEqual(
+    after.map((n) => n.id),
+    ['newest', 'middle', 'older'],
+    'a restored entry reappearing at the top has been re-sent, not restored',
+  );
+  // Undo pressed twice must not duplicate the row.
+  assert.equal(restoreNotification(after, middle).length, 3);
 });
 
 console.log('\n--- contrast ---');

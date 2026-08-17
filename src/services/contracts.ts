@@ -99,6 +99,12 @@ export interface NotificationService {
   getNotifications(): Promise<Page<AppNotification>>;
   markRead(id: string): Promise<void>;
   markAllRead(): Promise<void>;
+  /** Removes one entry. The only route by which an *unread* entry leaves. */
+  dismiss(id: string): Promise<void>;
+  /** Removes every read entry. Returns how many went, for the toast. */
+  clearRead(): Promise<number>;
+  /** Puts a dismissed entry back, in its original position. Undo depends on it. */
+  restore(notification: AppNotification): Promise<void>;
   getPreferences(): Promise<NotificationPreferences>;
   setPreferences(next: NotificationPreferences): Promise<NotificationPreferences>;
   /** Requests OS permission and returns whether it was granted. */

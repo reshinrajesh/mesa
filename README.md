@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 69 domain checks + 38 component and integration tests
+npm run verify     # typecheck + lint + 75 domain checks + 42 component and integration tests
 ```
 
 ---
@@ -34,7 +34,8 @@ as no availability at all.
 statuses, a two-hour change lock, optimistic cancel with rollback.
 
 **The rest.** Favourites with local persistence, a profile with preferences and saved addresses,
-a notification inbox with real local reminder scheduling, and full auth screens (welcome, sign in,
+a notification inbox with real local reminder scheduling and its own retention policy, and full
+auth screens (welcome, sign in,
 sign up, forgot password, OTP, Google/Apple, guest browsing) against a mock identity service.
 
 ### Deliberately not built
@@ -85,7 +86,7 @@ never rise above two. All three are fixed; this table is how the rest stays hone
 | No favourites | un-heart the three seeded ones |
 | No bookings | cancel the seeded ones |
 | No search results | search for something absent, e.g. `zzz` |
-| Empty inbox | reinstall — nothing in the app deletes notifications |
+| Empty inbox | dismiss each entry, or mark all read and clear them |
 | Closed that day | pick a Monday at Osteria Grano |
 | Nothing left today | browse after the last seating |
 | Sold out, waitlist offered | an evening at a popular venue — ~2% of nights entirely, 10–25% at peak |
@@ -101,12 +102,18 @@ never rise above two. All three are fixed; this table is how the rest stays hone
 | Dark theme, Reduce Motion | the OS settings |
 | All of the above, faster to click through | `npm run web` |
 
-The one state with no route to it is the empty inbox: notifications can be marked read but never
-removed. That is a missing product decision rather than a bug, and it is listed rather than hidden.
+Every state in that table is now reachable. The last one that was not — the empty inbox — was listed
+here as a missing product decision rather than a bug, and the decision has since been made: an inbox
+entry is a record of something that happened, not a task, so you may dismiss one (with an undo) or
+clear the ones you have already read (behind a confirmation), and **nothing removes an unread entry
+but you**. Not a bulk action, not age. Read entries expire after thirty days, counted from when they
+were read rather than when they arrived, because a year-old note you opened last night is one you
+have dealt with. The policy is five pure functions in `src/features/notifications/inbox.ts` and six
+domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 69 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 75 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -152,7 +159,7 @@ src/
   services/       contracts.ts + one mock implementation per contract
   store/          five Zustand stores, deliberately separate
   hooks/          TanStack Query bindings, one file per domain
-  features/       business logic: restaurants · recommendations · search · reservations
+  features/       business logic: restaurants · recommendations · search · reservations · notifications
   components/     ui/ (design system) · restaurant/ · reservation/ · map/
   validation/     Zod schemas
   lib/            QueryClient + offline persister
@@ -160,7 +167,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 69 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 75 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -338,8 +345,8 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 69 checks over the pure domain layer and the palette |
-| `npm test` | 38 component and HTTP integration tests |
+| `npm run test:domain` | 75 checks over the pure domain layer and the palette |
+| `npm test` | 42 component and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

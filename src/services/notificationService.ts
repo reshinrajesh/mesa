@@ -4,7 +4,9 @@ import { Platform } from 'react-native';
 import type { AppNotification, NotificationPreferences, Reservation } from '@/types';
 import type { NotificationService } from './contracts';
 
+import { clearRead, dismiss, expire, restore } from '@/features/notifications/inbox';
 import { seedNotifications } from '@/mock/seed';
+import { lightPalette } from '@/theme/palette';
 import { combine, formatTime } from '@/utils/date';
 import { localId } from '@/utils/id';
 import { log } from '@/utils/log';
@@ -70,7 +72,10 @@ async function ensureAndroidChannel(): Promise<void> {
   await Notifications.setNotificationChannelAsync('reservations', {
     name: 'Reservations',
     importance: Notifications.AndroidImportance.DEFAULT,
-    lightColor: '#C4552F',
+    // The notification LED is drawn by Android, on its own ground, in whichever
+    // theme the phone is in — so it takes the light accent rather than the
+    // scheme-dependent token, and takes it from the palette rather than a copy.
+    lightColor: lightPalette.accent,
     // No vibration: a table reminder does not need to interrupt.
     vibrationPattern: [0, 120],
   });
@@ -84,7 +89,15 @@ async function readInbox(): Promise<AppNotification[]> {
     await storage.set(SEEDED_FLAG, true);
     return seed;
   }
-  return storage.get<AppNotification[]>(storageKeys.notifications, []);
+
+  const stored = await storage.get<AppNotification[]>(storageKeys.notifications, []);
+  // Retention is applied on read rather than by a background job: there is no
+  // background job on a phone that has been shut for a month, and the moment
+  // someone opens the inbox is exactly when a stale entry starts to cost them
+  // something. Only written back when it actually removed something.
+  const live = expire(stored, new Date());
+  if (live.length !== stored.length) await storage.set(storageKeys.notifications, live);
+  return live;
 }
 
 export const notificationService: NotificationService = {
@@ -110,6 +123,23 @@ export const notificationService: NotificationService = {
       storageKeys.notifications,
       all.map((n) => ({ ...n, readAt: n.readAt ?? now })),
     );
+  },
+
+  async dismiss(id) {
+    const all = await readInbox();
+    await storage.set(storageKeys.notifications, dismiss(all, id));
+  },
+
+  async clearRead() {
+    const all = await readInbox();
+    const kept = clearRead(all);
+    await storage.set(storageKeys.notifications, kept);
+    return all.length - kept.length;
+  },
+
+  async restore(notification) {
+    const all = await readInbox();
+    await storage.set(storageKeys.notifications, restore(all, notification));
   },
 
   async getPreferences() {

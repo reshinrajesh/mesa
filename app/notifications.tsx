@@ -1,11 +1,12 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
-import type { AppNotification, NotificationKind } from '@/types';
+import type { AppNotification } from '@/types';
 
+import { NotificationRow } from '@/components/notification/NotificationRow';
 import {
+  ConfirmDialog,
   Divider,
   EmptyState,
   Pressable,
@@ -14,24 +15,15 @@ import {
   Skeleton,
   Text,
 } from '@/components/ui';
+import { readCount } from '@/features/notifications/inbox';
 import {
+  useClearReadNotifications,
+  useDismissNotification,
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
   useNotifications,
 } from '@/hooks/useNotifications';
 import { useTheme } from '@/theme';
-import { formatRelative } from '@/utils/date';
-
-const KIND_ICON: Record<NotificationKind, keyof typeof Ionicons.glyphMap> = {
-  'reservation-confirmed': 'checkmark-circle-outline',
-  'reservation-reminder': 'alarm-outline',
-  'reservation-modified': 'create-outline',
-  'reservation-cancelled': 'close-circle-outline',
-  'upcoming-reservation': 'calendar-outline',
-  'restaurant-offer': 'pricetag-outline',
-  'waitlist-joined': 'hourglass-outline',
-  'waitlist-offer': 'restaurant-outline',
-};
 
 export default function NotificationsScreen() {
   const theme = useTheme();
@@ -40,6 +32,11 @@ export default function NotificationsScreen() {
   const { items, unreadCount, isLoading } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
+  const dismiss = useDismissNotification();
+  const clearRead = useClearReadNotifications();
+
+  const [confirmingClear, setConfirmingClear] = React.useState(false);
+  const clearable = readCount(items);
 
   const open = (notification: AppNotification) => {
     if (notification.readAt === null) markRead.mutate(notification.id);
@@ -84,60 +81,13 @@ export default function NotificationsScreen() {
           }}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <Divider inset={48} />}
-          renderItem={({ item }) => {
-            const unread = item.readAt === null;
-            return (
-              <Pressable
-                onPress={() => open(item)}
-                accessibilityRole="button"
-                accessibilityLabel={`${unread ? 'Unread. ' : ''}${item.title}. ${item.body}`}
-                scaleTo={0.99}
-                dim
-                style={[styles.row, { paddingVertical: theme.spacing.base }]}
-              >
-                <View
-                  style={[
-                    styles.glyph,
-                    {
-                      backgroundColor: unread ? theme.colors.accentSoft : theme.colors.canvasSunk,
-                      borderRadius: theme.radius.sm,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name={KIND_ICON[item.kind]}
-                    size={17}
-                    color={unread ? theme.colors.accent : theme.colors.inkMuted}
-                  />
-                </View>
-
-                <View style={{ flex: 1, gap: 3 }}>
-                  <View style={styles.titleRow}>
-                    <Text
-                      variant={unread ? 'bodyStrong' : 'body'}
-                      style={{ flex: 1 }}
-                      numberOfLines={2}
-                    >
-                      {item.title}
-                    </Text>
-                    {/* Unread carries a dot as well as weight, because weight
-                        alone is not a reliable signal at small sizes. */}
-                    {unread ? (
-                      <View style={[styles.unreadDot, { backgroundColor: theme.colors.accent }]} />
-                    ) : null}
-                  </View>
-
-                  <Text variant="caption" tone="muted" numberOfLines={3}>
-                    {item.body}
-                  </Text>
-
-                  <Text variant="caption" tone="faint">
-                    {formatRelative(item.createdAt)}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item }) => (
+            <NotificationRow
+              notification={item}
+              onPress={open}
+              onDismiss={(notification) => dismiss.mutate(notification)}
+            />
+          )}
           ListEmptyComponent={
             <EmptyState
               icon="notifications-outline"
@@ -145,32 +95,55 @@ export default function NotificationsScreen() {
               message="Booking confirmations, reminders and the occasional note from a restaurant land here."
             />
           }
+          /* Below the list rather than in the header: a bulk delete should not
+             sit under the finger that has just tapped "Mark all read". */
+          ListFooterComponent={
+            clearable > 0 ? (
+              <Pressable
+                onPress={() => setConfirmingClear(true)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  clearable === 1
+                    ? 'Clear one read notification'
+                    : `Clear ${clearable} read notifications`
+                }
+                hitSlop={8}
+                style={{
+                  minHeight: 44,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: theme.spacing.lg,
+                }}
+              >
+                <Text variant="label" tone="muted">
+                  Clear read notifications
+                </Text>
+              </Pressable>
+            ) : null
+          }
         />
       )}
+
+      <ConfirmDialog
+        visible={confirmingClear}
+        title={clearable === 1 ? 'Clear one notification?' : `Clear ${clearable} notifications?`}
+        // States what survives, because the thing people fear about a bulk
+        // delete is the one entry they had not got to yet.
+        message={
+          unreadCount > 0
+            ? `Everything you have already read goes. ${unreadCount === 1 ? 'The unread one stays' : `The ${unreadCount} unread ones stay`}.`
+            : 'Everything you have already read goes. This cannot be undone.'
+        }
+        confirmLabel="Clear"
+        cancelLabel="Keep them"
+        destructive
+        loading={clearRead.isPending}
+        onConfirm={() => {
+          clearRead.mutate();
+          setConfirmingClear(false);
+        }}
+        onCancel={() => setConfirmingClear(false)}
+      />
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  glyph: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  unreadDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-});
