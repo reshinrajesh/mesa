@@ -217,8 +217,18 @@ itself and adding padding double-counts). Sticky footers add `insets.bottom` the
 
 Non-negotiable, and enforced in the primitives rather than screen by screen:
 
-- **44×44 minimum.** Controls that render smaller carry a computed `hitSlop` that brings them there.
-  `Button` does this arithmetic from its own height.
+- **44×44 minimum, computed.** Controls that render smaller carry a `hitSlop` from `hitSlopFor()`
+  that brings them there, and `src/screens/touch-targets.test.tsx` renders four screens and measures
+  every pressable whose style states a size. This was the last promise in this section that nothing
+  checked, and checking it found one: the slot pills on a restaurant card — 26pt tall with 8pt of
+  slop, so 42, near enough to look right in a review and two short of the promise. They are the
+  fastest path to a booking in the app. Hand-picked slop values are how that happens, so both places
+  that had one now compute it.
+
+  What the check cannot see is stated rather than hidden: a control sized by flex, padding or its own
+  text has no dimension until a layout engine runs, and there is none in a test renderer. Those are
+  skipped, and a fifth test asserts that something was measured at all, so a green run cannot mean
+  the selector stopped matching.
 - **Every interactive element has a role, a label and a state.** Slots announce "7:30 PM, 2 tables
   left" or "7:30 PM, fully booked"; unavailable slots are `disabled` so a screen reader says so
   instead of letting someone tap a dead pill.

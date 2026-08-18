@@ -6,6 +6,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring } 
 import { useTheme } from '@/theme';
 import { useToggleFavorite } from '@/hooks/useFavorites';
 import { Pressable, useReduceMotion } from '@/components/ui/Pressable';
+import { hitSlopFor } from '@/components/ui/touchTarget';
 
 export interface FavoriteButtonProps {
   restaurantId: string;
@@ -72,7 +73,7 @@ export const FavoriteButton = React.memo(function FavoriteButton({
       accessibilityLabel={
         isFavorite ? `Remove ${restaurantName} from favourites` : `Save ${restaurantName} to favourites`
       }
-      hitSlop={size < 44 ? (44 - size) / 2 : 6}
+      hitSlop={hitSlopFor(size)}
       scaleTo={1}
       style={[
         styles.button,

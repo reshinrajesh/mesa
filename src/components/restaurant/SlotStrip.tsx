@@ -4,6 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useTheme } from '@/theme';
 import { formatTime } from '@/utils/date';
 import { Pressable } from '@/components/ui/Pressable';
+import { hitSlopFor } from '@/components/ui/touchTarget';
 import { Text } from '@/components/ui/Text';
 
 export interface SlotStripProps {
@@ -32,7 +33,7 @@ export const SlotStrip = React.memo(function SlotStrip({ times, onSelect, style 
           disabled={!onSelect}
           accessibilityRole="button"
           accessibilityLabel={`Reserve at ${formatTime(time)}`}
-          hitSlop={8}
+          hitSlop={hitSlopFor(SLOT_HEIGHT)}
           scaleTo={0.94}
           style={[
             styles.slot,
@@ -84,7 +85,7 @@ export const WaitlistPill = React.memo(function WaitlistPill({
         disabled={!onPress}
         accessibilityRole="button"
         accessibilityLabel={`${restaurantName} is fully booked tonight. Join the waitlist.`}
-        hitSlop={8}
+        hitSlop={hitSlopFor(SLOT_HEIGHT)}
         scaleTo={0.94}
         style={[
           styles.slot,
@@ -105,6 +106,9 @@ export const WaitlistPill = React.memo(function WaitlistPill({
   );
 });
 
+/** Short by design — these sit under a card's title, not in a toolbar. */
+const SLOT_HEIGHT = 26;
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -112,7 +116,7 @@ const styles = StyleSheet.create({
   },
   slot: {
     paddingHorizontal: 8,
-    height: 26,
+    height: SLOT_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },

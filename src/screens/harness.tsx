@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
 import type { AppNotification, Reservation } from '@/types';
@@ -136,6 +137,80 @@ export async function givenStorage(options: {
 export async function storedNotifications(): Promise<AppNotification[]> {
   const raw = await AsyncStorage.getItem(storageKeys.notifications);
   return raw ? (JSON.parse(raw) as AppNotification[]) : [];
+}
+
+/** The floor DESIGN.md §9 promises, and iOS and Android both ask for. */
+export const MIN_TOUCH_TARGET = 44;
+
+/** Interactive roles this app actually uses. */
+const PRESSABLE_ROLES = ['button', 'tab', 'link', 'switch', 'search'] as const;
+
+export interface TouchTarget {
+  label: string;
+  /** Null where the dimension comes from layout rather than from the style. */
+  width: number | null;
+  height: number | null;
+}
+
+function edges(hitSlop: unknown) {
+  if (typeof hitSlop === 'number') {
+    return { top: hitSlop, bottom: hitSlop, left: hitSlop, right: hitSlop };
+  }
+  const slop = (hitSlop ?? {}) as Record<string, number | undefined>;
+  return {
+    top: slop.top ?? 0,
+    bottom: slop.bottom ?? 0,
+    left: slop.left ?? 0,
+    right: slop.right ?? 0,
+  };
+}
+
+/**
+ * Every pressable on screen whose own style states a size, hit area included.
+ *
+ * DESIGN.md has promised a 44×44 minimum since the first commit, enforced by
+ * "a computed `hitSlop`" on anything that renders smaller. Contrast used to be
+ * a promise like that too, and computing it found five violations — so this
+ * computes what it can.
+ *
+ * What it can is bounded, and the bound is stated rather than hidden: a control
+ * sized by flex, padding or its own text has no dimension until a layout engine
+ * runs, and there is no layout engine here. Those come back null and are not
+ * asserted on. What is left is exactly the class the promise is about — the
+ * small fixed-size icon buttons — which is also the class that gets it wrong.
+ */
+export function measurableTouchTargets(): TouchTarget[] {
+  const targets: TouchTarget[] = [];
+
+  for (const role of PRESSABLE_ROLES) {
+    for (const node of screen.queryAllByRole(role)) {
+      const style = (StyleSheet.flatten(node.props.style) ?? {}) as Record<string, unknown>;
+      const slop = edges(node.props.hitSlop);
+
+      const width = (style.width ?? style.minWidth) as number | undefined;
+      const height = (style.height ?? style.minHeight) as number | undefined;
+
+      targets.push({
+        label: String(node.props.accessibilityLabel ?? role),
+        width: typeof width === 'number' ? width + slop.left + slop.right : null,
+        height: typeof height === 'number' ? height + slop.top + slop.bottom : null,
+      });
+    }
+  }
+
+  return targets;
+}
+
+/** Fails with the offender named, since "something is too small" is not a fix. */
+export function expectEveryTargetReachable() {
+  for (const target of measurableTouchTargets()) {
+    if (target.width !== null && target.width < MIN_TOUCH_TARGET) {
+      throw new Error(`"${target.label}" is ${target.width}pt wide, needs ${MIN_TOUCH_TARGET}`);
+    }
+    if (target.height !== null && target.height < MIN_TOUCH_TARGET) {
+      throw new Error(`"${target.label}" is ${target.height}pt tall, needs ${MIN_TOUCH_TARGET}`);
+    }
+  }
 }
 
 export function notification(
