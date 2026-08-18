@@ -498,6 +498,10 @@ The foundation was built with these in mind. Each is additive:
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
+`npm run verify` also runs on GitHub Actions for every push to `main` and every pull request
+(`.github/workflows/verify.yml`). It had been the definition of "green" for this project while only
+ever running when somebody remembered to run it, which makes it a habit rather than a gate.
+
 ### Enabling real map tiles
 
 The fallback map works everywhere. For street tiles, make a development build
