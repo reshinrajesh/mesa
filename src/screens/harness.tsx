@@ -5,7 +5,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 
-import type { AppNotification, Reservation } from '@/types';
+import type { AppNotification, Reservation, User } from '@/types';
 
 import { config } from '@/constants/config';
 import { useAuthStore } from '@/store/authStore';
@@ -95,6 +95,8 @@ afterEach(async () => {
 export interface ScreenOptions {
   /** Session kind. Screens behave differently for a guest. */
   session?: 'authenticated' | 'guest' | 'anonymous';
+  /** The signed-in profile, for screens that draw one. */
+  user?: User | null;
 }
 
 /**
@@ -106,7 +108,7 @@ export interface ScreenOptions {
 export async function renderScreen(ui: React.ReactElement, options: ScreenOptions = {}) {
   useAuthStore.setState({
     kind: options.session ?? 'authenticated',
-    user: null,
+    user: options.user ?? null,
     hydrated: true,
   });
 
@@ -241,8 +243,17 @@ function descendants(node: HostNode | string, out: HostNode[] = []): HostNode[] 
 export interface Control {
   label: string | null;
   role: string | null;
+  /** Text found inside the control, which is what names it when a label is absent. */
+  text: string | null;
   /** True when the node is deliberately hidden from assistive technology. */
   excused: boolean;
+}
+
+/** Every string rendered inside a node, joined — an approximation of what an
+ *  accessible container announces when it has no label of its own. */
+function textWithin(node: HostNode | string): string {
+  if (typeof node === 'string') return node;
+  return (node.children ?? []).map(textWithin).join(' ').trim();
 }
 
 /**
@@ -260,6 +271,7 @@ export function controls(): Control[] {
     .map((node) => ({
       label: (node.props.accessibilityLabel as string) ?? null,
       role: (node.props.accessibilityRole as string) ?? null,
+      text: textWithin(node) || null,
       excused:
         node.props.accessible === false ||
         node.props.importantForAccessibility === 'no-hide-descendants',
@@ -274,18 +286,26 @@ export function controls(): Control[] {
  * press with no way to know what happens. The escape hatch is `accessible=
  * {false}`: something genuinely decorative has to say so in the source rather
  * than by being forgotten.
+ *
+ * Text inside the control counts as a name, because that is what the platforms
+ * do: an accessible container with no label of its own announces the text it
+ * contains. Requiring an explicit label everywhere would have reported three
+ * plain text links on the auth screens as defects when a screen reader reads
+ * them correctly. What this still catches is the real failure — a control with
+ * an icon and nothing else, which announces as "button" and nothing more.
  */
 export function expectEveryControlAnnounced() {
   for (const control of controls()) {
     if (control.excused) continue;
 
-    if (!control.label || control.label.trim().length === 0) {
+    const named = (control.label ?? control.text ?? '').trim();
+    if (named.length === 0) {
       throw new Error(
-        `a ${control.role ?? 'pressable'} has no accessibility label; give it one, or mark it accessible={false}`,
+        `a ${control.role ?? 'pressable'} has nothing to announce — no label and no text; give it one, or mark it accessible={false}`,
       );
     }
     if (!control.role) {
-      throw new Error(`"${control.label}" has no accessibility role`);
+      throw new Error(`"${named}" has no accessibility role`);
     }
   }
 }

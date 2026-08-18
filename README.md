@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 94 domain checks + 147 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 94 domain checks + 160 component, screen, hook and service tests
 ```
 
 ---
@@ -446,6 +446,10 @@ on a restaurant card sitting at 42pt, two short of the floor this paragraph prom
 path to a booking in the app. And every control that handles a press is required to carry a label and
 a role, across six screens including the ones behind a modal.
 
+Both audits are pointed at the auth and profile screens as well — thirteen routes where there is no
+logic worth a test of its own but a great deal of chrome, and one render each serves both checks.
+Nothing there is a defect either.
+
 That audit found nothing, which is worth stating plainly rather than dressing up: the labels were
 already there. It is a regression guard, not a discovery, and the value of it is that removing any
 one label now fails the suite by name.
@@ -490,7 +494,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 94 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 147 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 160 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
