@@ -27,11 +27,15 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          # 22 here against 24 on the machine this was written on: the pair is
+          # wider coverage than either alone, and both are inside what Expo
+          # SDK 54 supports. The actions are v5 because v4 runs on a Node the
+          # runners have deprecated — a warning today and a break later.
+          node-version: 22
           cache: npm
 
       # `ci` rather than `install`: the lockfile is the point of running this at
