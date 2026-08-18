@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 94 domain checks + 140 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 94 domain checks + 147 component, screen, hook and service tests
 ```
 
 ---
@@ -488,7 +488,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 94 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 140 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 147 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

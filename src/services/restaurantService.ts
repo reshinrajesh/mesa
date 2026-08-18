@@ -12,6 +12,7 @@ import { config } from '@/constants/config';
 import { emptyFilters } from '@/types';
 import { generateAvailability } from '@/mock/availability';
 import { genericMenu, menuByRestaurantId } from '@/mock/menus';
+import { CUISINES } from '@/constants/cuisines';
 import { mockRestaurants, restaurantById } from '@/mock/restaurants';
 import { applyFilters, decorate, matchesQuery, sortRestaurants } from '@/features/restaurants/query';
 import { AppError } from '@/utils/errors';
@@ -76,10 +77,16 @@ export const restaurantService: RestaurantService = {
         .slice(0, 4)
         .map((r) => ({ label: r.name, kind: 'restaurant' as const, value: r.id }));
 
-      const cuisines = Array.from(new Set(mockRestaurants.flatMap((r) => r.cuisines)))
-        .filter((c) => c.includes(q))
+      // Suggestions are read by a person, so they carry the label rather than
+      // the slug: this used to offer "italian" and "middle-eastern" in a list
+      // where everything else said "Italian" and "Middle Eastern". Matching on
+      // both means "middle eastern", typed the way it is written, finds it.
+      const available = new Set(mockRestaurants.flatMap((r) => r.cuisines));
+      const cuisines = CUISINES.filter(
+        (c) => available.has(c.value) && (c.value.includes(q) || c.label.toLowerCase().includes(q)),
+      )
         .slice(0, 3)
-        .map((c) => ({ label: c, kind: 'cuisine' as const, value: c }));
+        .map((c) => ({ label: c.label, kind: 'cuisine' as const, value: c.value }));
 
       const places = Array.from(new Set(mockRestaurants.map((r) => r.neighbourhood)))
         .filter((n) => n.toLowerCase().includes(q))
