@@ -238,9 +238,17 @@ Non-negotiable, and enforced in the primitives rather than screen by screen:
   that notices when the next one is not. Slots announce "7:30 PM, 2 tables
   left" or "7:30 PM, fully booked"; unavailable slots are `disabled` so a screen reader says so
   instead of letting someone tap a dead pill.
-- **Dynamic type**, capped per variant (§3).
+- **Dynamic type**, capped per variant (§3) — and the ceilings are compared against each other now,
+  not just set. A ceiling is a multiplier, so a variant that is larger at rest can end up *smaller*
+  than one beneath it at full scale. Three pairs did: a restaurant name reached 26.6pt while the
+  sentence under it reached 27, the sans subheading fell 3pt below its own body copy, and a rating
+  landed under the caption beside it. Invisible at default settings, glaring to the people who change
+  the setting. `heading`, `subheading` and `numeric` are looser now, a domain check compares every
+  pair at full scale, and a component test asserts each ceiling actually reaches the rendered `Text`
+  — a table nothing reads is decoration.
 - **Reduce Motion** respected via `useReduceMotion`, wired into `Pressable`, `Skeleton` and the
-  wizard's step transitions.
+  wizard's step transitions. Tested against the system setting in both positions, because a hook that
+  always returns `false` looks identical to a working one on a device where nobody turned it on.
 - **Contrast, computed rather than claimed.** This bullet used to promise ~11:1 body text and an
   accent that cleared 4.5:1. Both were wrong — body copy was 6.9:1, and the light accent was 4.19:1
   on the canvas, 4.48:1 under the white label of the primary button. Nothing checked, so nothing
@@ -269,6 +277,10 @@ Non-negotiable, and enforced in the primitives rather than screen by screen:
   saved heart is white on photography instead of terracotta, because a chip over a bright photo lands
   mid-grey and *no* mid-tone accent clears 3:1 there. The state is carried by the glyph filling in,
   which is the §2 rule anyway: colour never carries meaning alone.
-- **Live regions** on validation errors and toasts.
+- **Live regions** on validation errors and toasts, both asserted: a field error and a toast are the
+  only notice some failures ever give, and a toast that does not announce itself is a failure a
+  screen-reader user simply never hears about. The waitlist countdown deliberately has none — a live
+  region on a number that changes every second is unusable, and that decision is written where the
+  countdown is.
 - **Decorative images carry an empty label** so a screen reader does not read a filename; the
   container above them carries the real one.

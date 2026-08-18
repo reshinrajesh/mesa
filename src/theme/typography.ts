@@ -105,16 +105,31 @@ export const textVariants: Record<TextVariant, TextStyle> = {
  * Dynamic type ceiling. Users who scale text to 2x should get bigger text, but
  * a 34pt display line at 2x destroys every card layout in the app, so display
  * sizes are capped tighter than body sizes.
+ *
+ * The tighter cap has a second consequence that is easy to miss and ugly when
+ * it lands: a ceiling is a multiplier, so a variant that is larger at rest can
+ * end up *smaller* than one beneath it at full scale. Three pairs did. A
+ * restaurant name reached 26.6pt while the sentence under it reached 27, and a
+ * rating fell below the caption beside it — an inversion invisible at default
+ * settings and glaring to exactly the people who change the setting.
+ *
+ * So `heading`, `subheading` and `numeric` are looser than the layout alone
+ * would ask for, and a domain check compares every pair at full scale rather
+ * than trusting the next person to do the multiplication.
  */
 export const maxFontSizeMultiplier: Record<TextVariant, number> = {
   display: 1.3,
   title: 1.35,
-  heading: 1.4,
-  subheading: 1.5,
+  // 28.5 at full scale, which has to stay above body's 27.
+  heading: 1.5,
+  // 27.2, likewise.
+  subheading: 1.7,
   body: 1.8,
   bodyStrong: 1.8,
   label: 1.6,
   caption: 1.6,
   overline: 1.4,
-  numeric: 1.4,
+  // 20.8, above caption's 19.2. A price under the caption next to it reads as
+  // a mistake even when the numbers are right.
+  numeric: 1.6,
 };

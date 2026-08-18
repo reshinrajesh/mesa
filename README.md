@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 115 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 94 domain checks + 129 component, screen, hook and service tests
 ```
 
 ---
@@ -134,7 +134,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 90 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 94 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -228,7 +228,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 90 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 94 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -434,9 +434,15 @@ on a restaurant card sitting at 42pt, two short of the floor this paragraph prom
 path to a booking in the app. And every control that handles a press is required to carry a label and
 a role, across six screens including the ones behind a modal.
 
-That last audit found nothing, which is worth stating plainly rather than dressing up: the labels
-were already there. It is a regression guard, not a discovery, and the value of it is that removing
-any one label now fails the suite by name.
+That audit found nothing, which is worth stating plainly rather than dressing up: the labels were
+already there. It is a regression guard, not a discovery, and the value of it is that removing any
+one label now fails the suite by name.
+
+The remaining three promises in that section are computed as well, and the type scale gave up one
+more defect: at the largest system text setting a restaurant name rendered *smaller* than the
+sentence beneath it, because a per-variant ceiling is a multiplier and 19 × 1.4 is less than
+15 × 1.8. Two other pairs inverted the same way. Every §9 promise is now arithmetic, and four of the
+seven were wrong when first measured.
 
 Contrast is arithmetic rather than assertion. `src/theme/contrast.ts` holds the WCAG formulas and six
 of the domain checks walk every foreground against every ground it can land on — composited, so the
@@ -471,8 +477,8 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 115 component, screen, hook, service and HTTP integration tests |
+| `npm run test:domain` | 94 checks over the pure domain layer, the palette and the type scale |
+| `npm test` | 129 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

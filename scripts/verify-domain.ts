@@ -39,6 +39,7 @@ import {
   restore as restoreNotification,
 } from '@/features/notifications/inbox';
 import { contrastRatio, flatten } from '@/theme/contrast';
+import { maxFontSizeMultiplier, textVariants, type TextVariant } from '@/theme/typography';
 import { palettes } from '@/theme/palette';
 import { config } from '@/constants/config';
 import {
@@ -1125,6 +1126,61 @@ check('nothing rides along behind a valid id', () => {
 check('a payload that is not a payload is refused rather than thrown at', () => {
   for (const data of [null, undefined, 'string', 42, [], {}, { href: 42 }, { href: null }]) {
     assert.equal(routeFor(data), null);
+  }
+});
+
+console.log('\n--- type scale ---');
+
+/**
+ * Every variant, with the size it reaches at the largest system text setting.
+ */
+const scaled = (Object.keys(textVariants) as TextVariant[]).map((variant) => ({
+  variant,
+  rest: textVariants[variant].fontSize as number,
+  ceiling: maxFontSizeMultiplier[variant],
+  max: (textVariants[variant].fontSize as number) * maxFontSizeMultiplier[variant],
+}));
+
+check('every variant can grow, and none can grow without limit', () => {
+  for (const { variant, ceiling } of scaled) {
+    // Below 1.3 the setting barely does anything for someone who needs it;
+    // above 2.0 is past what the OS itself offers.
+    assert.ok(ceiling >= 1.3, `${variant} caps at ${ceiling}, too tight to help anyone`);
+    assert.ok(ceiling <= 2, `${variant} caps at ${ceiling}, past what the OS asks for`);
+  }
+});
+
+check('no variant grows past what a card can hold', () => {
+  // The display line is the reason per-variant ceilings exist at all: 34pt at
+  // 2x is 68, and nothing in this app survives that.
+  for (const { variant, max } of scaled) {
+    assert.ok(max <= 46, `${variant} reaches ${max.toFixed(1)}pt at full scale`);
+  }
+});
+
+check('the type hierarchy survives being scaled up', () => {
+  // The bug this exists to catch is invisible at default settings and obvious
+  // at the largest one: a variant that is smaller at rest overtaking a larger
+  // one, so a restaurant name ends up smaller than the sentence beneath it.
+  for (const a of scaled) {
+    for (const b of scaled) {
+      if (a.rest <= b.rest) continue;
+      assert.ok(
+        a.max >= b.max,
+        `${a.variant} is ${a.rest}pt against ${b.variant}'s ${b.rest}, ` +
+          `but scales to ${a.max.toFixed(1)} against ${b.max.toFixed(1)} — the hierarchy inverts`,
+      );
+    }
+  }
+});
+
+check('every line has room for the letters on it', () => {
+  for (const { variant } of scaled) {
+    const style = textVariants[variant];
+    assert.ok(
+      (style.lineHeight as number) > (style.fontSize as number),
+      `${variant} has a line height at or below its font size`,
+    );
   }
 });
 
