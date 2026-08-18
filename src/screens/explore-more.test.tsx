@@ -15,9 +15,13 @@ import { givenStorage, renderScreen } from './harness';
  * file times out whatever it asserts. Twenty-second waits prove it is a wedge
  * and not slowness.
  *
- * The minimal reproduction is four steps: render Explore, open the sheet, press
- * a filter chip, commit. Bisecting it ruled out more than it confirmed, and the
- * eliminations are the useful part:
+ * The minimal reproduction has since shrunk out of this screen entirely.
+ * Fifteen lines reproduce it with no Explore, no `FlashList` and no map: mount
+ * `FilterSheet`, press a chip, commit the draft, twice. A query keyed on the
+ * filters makes no difference — it wedges without one.
+ *
+ * Bisecting ruled out more than it confirmed, and the eliminations are the
+ * useful part:
  *
  * - Not the number of renders. Five plain renders of Explore in one file pass,
  *   which makes the first version of this comment — "a few renders per module"
@@ -29,13 +33,14 @@ import { givenStorage, renderScreen } from './harness';
  * - Not reanimated in `Pressable`; a plain RN `Pressable` still wedges.
  * - Not the test harness; a bare `QueryClientProvider` wedges too.
  * - Not the unmount: committing while the sheet stays *open* wedges as well.
- * - Not the query-key change alone: the same commit with no sheet mounted is
- *   fine, five times over.
+ * - Not the results query: the repro above has none.
+ * - Not the store write on its own: committing with no sheet mounted is fine,
+ *   five times over.
  *
- * What is left is the combination — the filter sheet mounted while the results
- * query changes key — and that is where the next person should start. Until
- * then this test gets the first render in its own file, and `explore.test.tsx`
- * holds the three that fit alongside each other.
+ * What is left is the sheet itself plus a store write that re-renders its
+ * parent, and that is where the next person should start — inside `FilterSheet`
+ * rather than inside Explore. Until then this test gets the first render in its
+ * own file, and `explore.test.tsx` holds the three that fit alongside it.
  *
  * What did not survive the split is the empty-list copy, which changes
  * depending on whether filters are to blame. It is a real branch and it is

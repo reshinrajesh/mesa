@@ -173,12 +173,14 @@ committing a *changed* filter set corrupts React's `act` queue — "overlapping 
 which every render in that Jest module returns an empty tree and every later test times out whatever
 it asserts. Twenty-second waits prove it is a wedge rather than slowness.
 
-The minimal reproduction is four steps: render Explore, open the sheet, press a chip, commit.
-Bisecting eliminated more than it confirmed, and the eliminations are the useful part — it is not the
-number of renders (five plain renders pass), not the modal, not `FlashList`, not gesture-handler, not
-reanimated in `Pressable`, not the test harness, not the unmount, and not the query-key change on its
-own. What remains is the combination: the sheet mounted while the results query changes key. The
-tests are split across two files as a workaround, and one branch — the empty-list copy, which changes
+The reproduction has since shrunk out of the screen entirely: fifteen lines with no Explore, no
+`FlashList` and no map — mount `FilterSheet`, press a chip, commit the draft, twice. Bisecting
+eliminated far more than it confirmed, and the eliminations are the useful part: not the number of
+renders (five plain renders of Explore pass), not the modal, not `FlashList`, not gesture-handler,
+not reanimated in `Pressable`, not the test harness, not the unmount, not the results query, and not
+the store write on its own. What remains is the sheet plus a store write that re-renders its parent,
+which is where the next attempt should start — inside `FilterSheet`, not inside Explore. The tests
+are split across two files as a workaround, and one branch — the empty-list copy, which changes
 depending on whether filters are to blame — is untested for that reason rather than by choice. `useInboxReconciliation.test.tsx` is the
 fourth: the loop that files those rows writes, invalidates the query it just read, and is re-run by
 that invalidation, so what stops it is that the rows it filed are no longer missing. That is a
