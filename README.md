@@ -168,16 +168,18 @@ Those files live under `src/` rather than beside the screens because they cannot
 expo-router builds its route table from `require.context(app, true, /.*\.[tj]sx?$/)`, so
 `app/notifications.test.tsx` would ship in the bundle as a route called "notifications.test".
 
-One screen fought back and is worth warning about. Explore can only be rendered a few times per Jest
-module: past that the renderer stops producing output altogether, the next render returns an empty
-tree, every query waits out its timeout — twenty seconds proves it is a wedge rather than slowness —
-and every test after it fails identically whatever it asserts. It is preceded by "overlapping act()
-calls", and none of the usual answers touch it: awaiting the dismissing press, waiting for the sheet
-to leave the tree, draining the query client, outlasting the search debounce, disposing the client,
-reordering. The screen carries a `FlashList` and a map, and one of them holds something across
-unmounts. Its tests are split across two files as a workaround, and one branch — the empty-list copy,
-which changes depending on whether filters are to blame — is currently untested for that reason
-rather than by choice. `useInboxReconciliation.test.tsx` is the
+One screen fought back and is worth warning about. On Explore, opening the filter sheet and
+committing a *changed* filter set corrupts React's `act` queue — "overlapping act() calls" — after
+which every render in that Jest module returns an empty tree and every later test times out whatever
+it asserts. Twenty-second waits prove it is a wedge rather than slowness.
+
+The minimal reproduction is four steps: render Explore, open the sheet, press a chip, commit.
+Bisecting eliminated more than it confirmed, and the eliminations are the useful part — it is not the
+number of renders (five plain renders pass), not the modal, not `FlashList`, not gesture-handler, not
+reanimated in `Pressable`, not the test harness, not the unmount, and not the query-key change on its
+own. What remains is the combination: the sheet mounted while the results query changes key. The
+tests are split across two files as a workaround, and one branch — the empty-list copy, which changes
+depending on whether filters are to blame — is untested for that reason rather than by choice. `useInboxReconciliation.test.tsx` is the
 fourth: the loop that files those rows writes, invalidates the query it just read, and is re-run by
 that invalidation, so what stops it is that the rows it filed are no longer missing. That is a
 convergence argument rather than a guard — the kind of thing that is either right or spins for ever

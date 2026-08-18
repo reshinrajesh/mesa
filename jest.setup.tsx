@@ -9,6 +9,14 @@
  * app to behave differently, that belongs in the test.
  */
 
+/**
+ * The setup react-native-gesture-handler ships and this project had never
+ * registered. Added while hunting the Explore renderer wedge; it did not fix
+ * it, and it stays because a `GestureDetector` mounting against a stub native
+ * module is a thing to fix regardless of what else was wrong.
+ */
+require('react-native-gesture-handler/jestSetup');
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => ({}),

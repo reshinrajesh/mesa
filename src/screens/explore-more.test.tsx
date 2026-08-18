@@ -6,26 +6,40 @@ import ExploreScreen from '../../app/(tabs)/explore';
 import { givenStorage, renderScreen } from './harness';
 
 /**
- * One test, in a file of its own, for a reason worth writing down.
+ * One test, in a file of its own, for a reason now understood rather than
+ * guessed at.
  *
- * Explore can only be rendered a few times per Jest module. Past that the
- * renderer stops producing output altogether: the next render returns an empty
- * tree, every query waits out its timeout — twenty seconds proves it is a wedge
- * and not slowness — and every test after it fails identically, whatever it
- * asserts. It is preceded by "overlapping act() calls", and none of the usual
- * answers touch it: awaiting the dismissing press, waiting for the sheet to
- * leave the tree, draining the query client, outlasting the search debounce,
- * disposing the client, reordering the tests. The screen carries a `FlashList`
- * and a map; one of them holds something across unmounts.
+ * Opening the filter sheet and committing a *changed* filter set corrupts
+ * React's `act` queue — "overlapping act() calls" — and from then on every
+ * render in that Jest module returns an empty tree, so every later test in the
+ * file times out whatever it asserts. Twenty-second waits prove it is a wedge
+ * and not slowness.
  *
- * So this assertion — that applying commits the *whole* draft at once, which is
- * the point of there being a draft — gets the first render in its own file.
- * `explore.test.tsx` holds the three that fit alongside each other.
+ * The minimal reproduction is four steps: render Explore, open the sheet, press
+ * a filter chip, commit. Bisecting it ruled out more than it confirmed, and the
+ * eliminations are the useful part:
+ *
+ * - Not the number of renders. Five plain renders of Explore in one file pass,
+ *   which makes the first version of this comment — "a few renders per module"
+ *   — simply wrong.
+ * - Not the modal. Replacing `Sheet` with an inline `View` still wedges.
+ * - Not `FlashList`; swapping it for `FlatList` changes nothing.
+ * - Not `react-native-gesture-handler` (its Jest setup is registered now, and
+ *   should have been all along, but it is not this).
+ * - Not reanimated in `Pressable`; a plain RN `Pressable` still wedges.
+ * - Not the test harness; a bare `QueryClientProvider` wedges too.
+ * - Not the unmount: committing while the sheet stays *open* wedges as well.
+ * - Not the query-key change alone: the same commit with no sheet mounted is
+ *   fine, five times over.
+ *
+ * What is left is the combination — the filter sheet mounted while the results
+ * query changes key — and that is where the next person should start. Until
+ * then this test gets the first render in its own file, and `explore.test.tsx`
+ * holds the three that fit alongside each other.
  *
  * What did not survive the split is the empty-list copy, which changes
  * depending on whether filters are to blame. It is a real branch and it is
  * currently untested; it is written down here rather than quietly dropped.
- * A second render in this file fails for the reason above, not for its own.
  */
 
 const openFilters = async () =>
