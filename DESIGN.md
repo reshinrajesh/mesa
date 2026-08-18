@@ -229,7 +229,13 @@ Non-negotiable, and enforced in the primitives rather than screen by screen:
   text has no dimension until a layout engine runs, and there is none in a test renderer. Those are
   skipped, and a fifth test asserts that something was measured at all, so a green run cannot mean
   the selector stopped matching.
-- **Every interactive element has a role, a label and a state.** Slots announce "7:30 PM, 2 tables
+- **Every interactive element has a role, a label and a state**, and this one is now computed too.
+  `src/screens/labels.test.tsx` walks six rendered screens for anything that handles a press — found
+  by its responder props rather than by its role, since a role query is blind to exactly the omission
+  being looked for — and requires a label and a role on each, unless it is marked `accessible={false}`
+  in the source. Unlike the other two audits this one found nothing: the modal scrims, the gallery
+  dots, the progress segments and the row actions were all already described. It stays as the thing
+  that notices when the next one is not. Slots announce "7:30 PM, 2 tables
   left" or "7:30 PM, fully booked"; unavailable slots are `disabled` so a screen reader says so
   instead of letting someone tap a dead pill.
 - **Dynamic type**, capped per variant (§3).

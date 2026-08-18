@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 90 domain checks + 107 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 90 domain checks + 115 component, screen, hook and service tests
 ```
 
 ---
@@ -428,10 +428,15 @@ Accessibility is built in rather than retrofitted: every pressable is at least 4
 where it renders smaller), every variant carries its own dynamic-type ceiling, no status is signalled
 by colour alone, and Reduce Motion swaps scale animations for opacity.
 
-Two of those are now arithmetic rather than intention. Contrast is computed against every ground a
-colour can land on, and touch targets are measured on four rendered screens — which found the slot
-pills on a restaurant card sitting at 42pt, two short of the floor this paragraph promises, on the
-fastest path to a booking in the app.
+Three of those are now computed rather than intended. Contrast is measured against every ground a
+colour can land on. Touch targets are measured on five rendered screens — which found the slot pills
+on a restaurant card sitting at 42pt, two short of the floor this paragraph promises, on the fastest
+path to a booking in the app. And every control that handles a press is required to carry a label and
+a role, across six screens including the ones behind a modal.
+
+That last audit found nothing, which is worth stating plainly rather than dressing up: the labels
+were already there. It is a regression guard, not a discovery, and the value of it is that removing
+any one label now fails the suite by name.
 
 Contrast is arithmetic rather than assertion. `src/theme/contrast.ts` holds the WCAG formulas and six
 of the domain checks walk every foreground against every ground it can land on — composited, so the
@@ -467,7 +472,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 90 checks over the pure domain layer and the palette |
-| `npm test` | 107 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 115 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

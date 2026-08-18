@@ -213,6 +213,71 @@ export function expectEveryTargetReachable() {
   }
 }
 
+interface HostNode {
+  type: unknown;
+  props: Record<string, unknown>;
+  children: (HostNode | string)[];
+}
+
+function descendants(node: HostNode | string, out: HostNode[] = []): HostNode[] {
+  if (typeof node === 'string') return out;
+  out.push(node);
+  for (const child of node.children ?? []) descendants(child, out);
+  return out;
+}
+
+export interface Control {
+  label: string | null;
+  role: string | null;
+  /** True when the node is deliberately hidden from assistive technology. */
+  excused: boolean;
+}
+
+/**
+ * Every control on screen, found by its press handling rather than by its role.
+ *
+ * The distinction is the entire point. `queryAllByRole('button')` can only find
+ * controls that already declare a role, which means the audit would be blind to
+ * exactly the omission it exists to catch. React Native routes every press
+ * through the responder system, so `onStartShouldSetResponder` is present on a
+ * pressable whether or not anybody remembered to describe it.
+ */
+export function controls(): Control[] {
+  return descendants(screen.root as unknown as HostNode)
+    .filter((node) => 'onStartShouldSetResponder' in node.props)
+    .map((node) => ({
+      label: (node.props.accessibilityLabel as string) ?? null,
+      role: (node.props.accessibilityRole as string) ?? null,
+      excused:
+        node.props.accessible === false ||
+        node.props.importantForAccessibility === 'no-hide-descendants',
+    }));
+}
+
+/**
+ * DESIGN.md §9: "every interactive element has a role, a label and a state".
+ *
+ * A control with neither is not a minor omission — a screen reader announces it
+ * as an unlabelled button, which is worse than silence, because it invites a
+ * press with no way to know what happens. The escape hatch is `accessible=
+ * {false}`: something genuinely decorative has to say so in the source rather
+ * than by being forgotten.
+ */
+export function expectEveryControlAnnounced() {
+  for (const control of controls()) {
+    if (control.excused) continue;
+
+    if (!control.label || control.label.trim().length === 0) {
+      throw new Error(
+        `a ${control.role ?? 'pressable'} has no accessibility label; give it one, or mark it accessible={false}`,
+      );
+    }
+    if (!control.role) {
+      throw new Error(`"${control.label}" has no accessibility role`);
+    }
+  }
+}
+
 export function notification(
   id: string,
   overrides: Partial<AppNotification> = {},

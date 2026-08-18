@@ -8,6 +8,7 @@ import HomeScreen from '../../app/(tabs)/index';
 import ReservationsScreen from '../../app/(tabs)/reservations';
 import NotificationsScreen from '../../app/notifications';
 import ReserveScreen from '../../app/reserve/[restaurantId]/index';
+import RestaurantScreen from '../../app/restaurant/[id]/index';
 import {
   expectEveryTargetReachable,
   givenStorage,
@@ -28,6 +29,13 @@ import {
  * Explore is absent, and not by choice: see `explore-more.test.tsx` for the
  * renderer wedge that stops it being rendered here as well.
  */
+
+// Both keys, so one mock serves the wizard (restaurantId) and the venue page (id).
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: () => ({ id: 'rst_grano', restaurantId: 'rst_grano' }),
+  Link: 'Link',
+}));
 
 const RESERVATION: Reservation = {
   id: 'rsv_1',
@@ -75,6 +83,14 @@ describe('touch targets', () => {
     await givenStorage({});
     await renderScreen(<ReserveScreen />);
     await screen.findByLabelText('Continue');
+
+    expectEveryTargetReachable();
+  });
+
+  it('the venue page, whose hero buttons sit on photography', async () => {
+    await givenStorage({});
+    await renderScreen(<RestaurantScreen />);
+    await screen.findByLabelText('Go back', {}, { timeout: 5_000 });
 
     expectEveryTargetReachable();
   });
