@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen } from '@testing-library/react-native';
+import { act, configure, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
@@ -26,6 +26,18 @@ import { storageKeys } from '@/utils/storage';
  * `+api` and `+html` becomes a route — so `app/notifications.test.tsx` would
  * ship in the bundle as a screen called "notifications.test".
  */
+
+/**
+ * Longer than the default second for `findBy*` and `waitFor`.
+ *
+ * The mock services answer in 180–520ms and a screen usually makes two or three
+ * round trips before it settles, which is comfortably inside a second on an
+ * idle machine and marginal on a busy one. A test that fails only when the CPU
+ * is loaded is worse than a slow one: it fails somewhere else, later, in front
+ * of somebody who did not write it. Nothing here passes that would otherwise
+ * fail — a broken assertion still breaks, four seconds further on.
+ */
+configure({ asyncUtilTimeout: 5_000 });
 
 /** Fixed insets: the real provider measures asynchronously and never resolves in a test. */
 const METRICS: Metrics = {

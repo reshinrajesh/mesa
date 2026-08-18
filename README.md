@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 94 domain checks + 129 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 94 domain checks + 132 component, screen, hook and service tests
 ```
 
 ---
@@ -377,6 +377,16 @@ instant of the next transition rather than a poll, because `nextDueAt` already k
 Six checks walk a booking from "tomorrow" through "in three hours" to "how was it?" without a
 renderer, a timer or a real calendar.
 
+**Every route the app writes down is checked against the filesystem.** expo-router types its own
+paths, and stops the moment anyone reaches for a cast — `router.push(route as never)` appears twice
+here, in the notification router and the inbox row, because a path assembled at runtime cannot be
+typed. Both are on the path a *notification* opens, which nobody clicks during development and which
+matters most when it is wrong: a dead link there is a table held for twenty minutes with no way to
+reach it. So `src/screens/routes.test.ts` reads the route table off `app/` the way the bundler does
+and matches every route literal in the source against it, segment by segment, so a concrete
+`/reservation/rsv_grano_upcoming` in the seed is checked against `reservation/[id]` rather than
+dismissed as unknown.
+
 **A notification decides nothing about where it goes.** Every alert the app schedules carries an
 `href`, and for a while nothing read it — tapping "a table just came free, confirm before the hold
 runs out" opened the app wherever it happened to be, which is the one notification in Mesa with a
@@ -478,7 +488,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 94 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 129 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 132 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
