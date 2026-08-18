@@ -19,5 +19,15 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: ['<rootDir>/src/**/*.test.tsx', '<rootDir>/src/**/*.test.ts'],
+  /**
+   * Comfortably above the 5s the screen harness allows a `findBy*` to wait.
+   *
+   * These two numbers have to be set together and were not: raising the async
+   * timeout alone means a query may wait the full five seconds inside a test
+   * that is only allowed to run for five, so the slowest test in each file —
+   * the first, which pays for the module graph — fails on the clock rather than
+   * on its assertion.
+   */
+  testTimeout: 20_000,
   collectCoverageFrom: ['src/components/**/*.tsx', 'src/features/**/*.ts'],
 };
