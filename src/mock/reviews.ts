@@ -1,7 +1,7 @@
 import type { Review } from '@/types';
 
 import { avatarPhoto } from './images';
-import { mockRestaurants } from './restaurants';
+import { mockRestaurants, usingImportedVenues } from './restaurants';
 import { seededUnit } from '@/utils/id';
 
 /**
@@ -195,7 +195,20 @@ function generateFor(restaurantId: string, rating: number): Review[] {
   });
 }
 
-export const mockReviews: Review[] = [
-  ...authored.map((review, index) => ({ ...review, id: `rev_authored_${index}` })),
-  ...mockRestaurants.flatMap((restaurant) => generateFor(restaurant.id, restaurant.rating)),
-];
+/**
+ * Nothing here is written about a real restaurant.
+ *
+ * Both halves below are invented — the authored ones by hand, the rest by a
+ * seeded generator — and they exist to give the review screen something to
+ * draw for venues that do not exist either. The moment the dataset is real
+ * venues imported from Google, every one of them is withheld: a made-up review
+ * under a real business's name is defamation-shaped, and the rating those
+ * screens fall back to is Google's own, which at least belongs to the people
+ * who left it.
+ */
+export const mockReviews: Review[] = usingImportedVenues
+  ? []
+  : [
+      ...authored.map((review, index) => ({ ...review, id: `rev_authored_${index}` })),
+      ...mockRestaurants.flatMap((restaurant) => generateFor(restaurant.id, restaurant.rating)),
+    ];

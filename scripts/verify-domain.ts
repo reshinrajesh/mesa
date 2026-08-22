@@ -2,7 +2,13 @@
 import assert from 'node:assert';
 
 import { generateAvailability, previewBoard, previewSlots } from '@/mock/availability';
-import { mockRestaurants, restaurantById } from '@/mock/restaurants';
+import {
+  mockRestaurants,
+  restaurantById,
+  usingImportedVenues,
+  venuesImportedAt,
+} from '@/mock/restaurants';
+import { mockReviews } from '@/mock/reviews';
 import { seedNotifications, seedReservations } from '@/mock/seed';
 import { settleElapsed, SETTLE_AFTER_MS } from '@/features/reservations/lifecycle';
 import { getOpenState, weeklyHours } from '@/features/restaurants/openingHours';
@@ -118,6 +124,38 @@ check('rupees are grouped the Indian way', () => {
   assert.equal(formatCurrency(1234567), '₹12,34,567');
   // A venue pricing in something else still formats that way.
   assert.equal(formatCurrency(34, 'EUR'), '€34');
+});
+
+console.log('\n--- imported venues ---');
+const CACHE_WINDOW_MS = 30 * 86_400_000;
+check('imported venue data stays inside Google’s caching window', () => {
+  // Google permits caching Places content for thirty days. A generated file in
+  // a working tree is a cache with no expiry, so the licence term is enforced
+  // here rather than remembered: an import older than the window fails the
+  // build of whoever is using it.
+  if (!venuesImportedAt) {
+    assert.equal(usingImportedVenues, false, 'venues imported with no timestamp');
+    return;
+  }
+  const age = Date.now() - Date.parse(venuesImportedAt);
+  assert.ok(Number.isFinite(age), `unparseable import stamp: ${venuesImportedAt}`);
+  assert.ok(
+    age < CACHE_WINDOW_MS,
+    `Places data is ${Math.round(age / 86_400_000)} days old; re-run scripts/import-places.ts`,
+  );
+});
+check('a real venue is never given an invented review', () => {
+  // The app fabricates availability, menus and prices, and none of that is
+  // attributed to anybody. A review is: it carries a name, a rating and an
+  // opinion, and under a real restaurant that is somebody's reputation being
+  // written for them. So the generator is off entirely when the dataset is
+  // real, and this asserts it in both directions.
+  if (usingImportedVenues) {
+    assert.equal(mockReviews.length, 0, 'invented reviews are attached to real venues');
+  } else {
+    assert.ok(mockReviews.length > 0, 'the invented dataset lost its reviews');
+    assert.equal(mockRestaurants.length, 16);
+  }
 });
 
 console.log('\n--- geo ---');
