@@ -28,7 +28,9 @@ import {
   useReservation,
   useWaitlistStatus,
 } from '@/hooks/useReservations';
+import { canOrder } from '@/features/orders/cart';
 import { useBill } from '@/hooks/useBill';
+import { useTableOrders } from '@/hooks/useTableOrders';
 import { useRestaurant } from '@/hooks/useRestaurants';
 import { useReservationDraftStore } from '@/store/reservationDraftStore';
 import { useTheme } from '@/theme';
@@ -60,6 +62,8 @@ export default function ReservationDetailScreen() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const { bill } = useBill(id);
+  const { orders } = useTableOrders(id);
+  const orderable = canOrder(reservation, todayKey());
 
   if (isError) {
     return (
@@ -250,6 +254,49 @@ export default function ReservationDetailScreen() {
           </Card>
         ) : null}
 
+        {/*
+          The table, above whichever branch the booking falls into.
+          
+          These used to sit inside the past-booking arm, which is where a bill
+          normally shows up -- and it made the whole dine-in flow dead-end: a
+          walk-in is today and confirmed, so it renders as *upcoming*, and
+          neither ordering nor the bill was reachable from the booking it had
+          just created. Ordering and paying belong to the table, not to which
+          tab it is filed under.
+        */}
+        {orderable || bill ? (
+          <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.base }}>
+            {orderable ? (
+              <Button
+                label={orders.length > 0 ? 'Order another round' : 'Order at the table'}
+                fullWidth
+                icon="restaurant-outline"
+                onPress={() => router.push(`/reservation/${reservation.id}/order`)}
+              />
+            ) : null}
+
+            {bill && bill.status === 'open' ? (
+              <Button
+                label={`Pay the bill · ${formatPaise(bill.total)}`}
+                variant={orderable ? 'secondary' : 'primary'}
+                fullWidth
+                icon="card-outline"
+                onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
+              />
+            ) : null}
+
+            {bill && bill.status === 'paid' ? (
+              <Button
+                label="See the receipt"
+                variant="secondary"
+                fullWidth
+                icon="receipt-outline"
+                onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
         {queued ? (
           <View style={{ gap: theme.spacing.sm }}>
             <Button
@@ -319,29 +366,6 @@ export default function ReservationDetailScreen() {
           </View>
         ) : (
           <View style={{ gap: theme.spacing.sm }}>
-            {/*
-              The bill leads, when there is one. An unpaid bill is the only
-              thing on a finished booking that somebody else is waiting on, and
-              burying it under "Book this again" would be optimistic about
-              which of the two the guest opened this screen for.
-            */}
-            {bill && bill.status === 'open' ? (
-              <Button
-                label={`Pay the bill · ${formatPaise(bill.total)}`}
-                fullWidth
-                icon="card-outline"
-                onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
-              />
-            ) : null}
-            {bill && bill.status === 'paid' ? (
-              <Button
-                label="See the receipt"
-                variant="secondary"
-                fullWidth
-                icon="receipt-outline"
-                onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
-              />
-            ) : null}
             <Button
               label="Book this again"
               variant={bill && bill.status === 'open' ? 'secondary' : 'primary'}

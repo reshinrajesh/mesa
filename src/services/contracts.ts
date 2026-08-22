@@ -3,11 +3,13 @@ import type {
   AuthTokens,
   AvailabilityDay,
   Bill,
+  CartLine,
   CreateReservationInput,
   CreateReviewInput,
   JoinWaitlistInput,
   Menu,
   NotificationPreferences,
+  Order,
   Page,
   PaymentAuthorization,
   PaymentMethod,
@@ -62,6 +64,16 @@ export interface ReservationService {
   getReservations(): Promise<Page<Reservation>>;
   getReservationById(id: string): Promise<Reservation>;
   createReservation(input: CreateReservationInput): Promise<Reservation>;
+  /**
+   * Start a table for somebody standing in the restaurant.
+   *
+   * Not `createReservation` with today's date: booking rules exist to protect
+   * a table nobody is sitting at yet, and every one of them is wrong for a
+   * guest who is already there. No lead time, no two-hour lock, no slot to
+   * hold — the venue has sat them down, and the app's job is to give them
+   * something to order against.
+   */
+  startWalkIn(restaurantId: string, partySize: number): Promise<Reservation>;
   updateReservation(input: UpdateReservationInput): Promise<Reservation>;
   /**
    * Also the way to leave a waitlist: an entry is a reservation that has not
@@ -169,6 +181,25 @@ export interface PaymentService {
   checkout(order: PaymentOrder, method: PaymentMethod): Promise<PaymentAuthorization>;
   /** Server-side verification. Returns the settled bill, or throws. */
   confirmPayment(authorization: PaymentAuthorization): Promise<Bill>;
+}
+
+/**
+ * Ordering from the table.
+ *
+ * Separate from `PaymentService` on purpose, even though the rounds become the
+ * bill: the kitchen and the till are two systems in a real restaurant, and the
+ * day this points at a POS it will point at a different one from the payments.
+ *
+ * There is no `updateOrder`. A round that has been sent is the kitchen's, and
+ * the only thing the guest can do to it is withdraw it before it is taken.
+ */
+export interface OrderService {
+  /** Every round this table has sent, oldest first. */
+  getOrders(reservationId: string): Promise<Order[]>;
+  /** Send a round. The server prices it from the menu, not from the client. */
+  placeOrder(reservationId: string, lines: CartLine[]): Promise<Order>;
+  /** Withdraw a round the kitchen has not taken yet. */
+  withdrawOrder(orderId: string): Promise<Order>;
 }
 
 export interface ReviewService {

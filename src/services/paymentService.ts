@@ -1,5 +1,6 @@
-import type { Bill, PaymentAuthorization, PaymentMethod, PaymentOrder } from '@/types';
+import type { Bill, Order, PaymentAuthorization, PaymentMethod, PaymentOrder } from '@/types';
 
+import { billableOrders } from '@/features/orders/cart';
 import { discountAmount, discountForSlot, headlineOffer, settleTotals } from '@/features/offers/deals';
 import { AppError } from '@/utils/errors';
 import { localId, seededUnit } from '@/utils/id';
@@ -8,6 +9,7 @@ import { restaurantById } from '@/mock/restaurants';
 import { storage, storageKeys } from '@/utils/storage';
 import type { PaymentService } from './contracts';
 import { delay, simulate } from './latency';
+import { orderService } from './orderService';
 import { reservationService } from './reservationService';
 
 /**
@@ -50,6 +52,11 @@ async function writeBills(bills: StoredBill[]): Promise<void> {
 /**
  * What the table ate, invented once and then remembered.
  *
+ * Only used by a booking that ordered nothing through the app. A guest who
+ * ordered at the table has real lines and gets those instead — the invented
+ * ones are what stands in for a paper docket the app never saw, so that a
+ * booking from before in-dine ordering existed still has a bill to pay.
+ *
  * Seeded from the reservation id so the same booking always produces the same
  * bill: a total that changes between two reads of the same screen is a total
  * nobody would pay, and the guest may well open this twice while the card
@@ -83,6 +90,26 @@ function draftLines(reservationId: string, partySize: number) {
 }
 
 /**
+ * The bill, as the table actually ordered it.
+ *
+ * Every round that was not withdrawn, in the order it was sent, with the
+ * prices fixed at the moment each was placed rather than whatever the menu
+ * says now. That last part is the whole reason an order line carries a price:
+ * a venue that raises its prices at seven should not reprice the starters a
+ * table ordered at half six.
+ */
+function linesFromOrders(orders: Order[]) {
+  return billableOrders(orders).flatMap((order) =>
+    order.lines.map((line) => ({
+      id: line.id,
+      name: order.round > 1 ? `${line.name} (round ${order.round})` : line.name,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+    })),
+  );
+}
+
+/**
  * A bill exists once somebody has eaten, and not before.
  *
  * The venue raises it in the real world; here the trigger is the booking
@@ -93,8 +120,14 @@ function draftLines(reservationId: string, partySize: number) {
  * more useful — you pay before you leave, not after the app has decided your
  * evening is over.
  */
-function billable(status: string): boolean {
-  return status === 'completed';
+function billable(status: string, hasOrdered: boolean): boolean {
+  if (status === 'cancelled' || status === 'no-show' || status === 'waitlisted') return false;
+  // Ordering is the honest trigger: a table that has sent a round is sitting
+  // there with food coming, and should be able to settle up and leave rather
+  // than wait four hours for the app to decide the evening is over.
+  // Completion is the fallback, for a table that ordered on paper and wants
+  // the app only for the paying.
+  return hasOrdered || status === 'completed';
 }
 
 async function ensureBill(reservationId: string): Promise<StoredBill | null> {
@@ -103,9 +136,13 @@ async function ensureBill(reservationId: string): Promise<StoredBill | null> {
   if (existing) return existing;
 
   const reservation = await reservationService.getReservationById(reservationId);
-  if (!billable(reservation.status)) return null;
+  const ordered = await orderService.getOrders(reservationId);
+  const billableRounds = billableOrders(ordered);
+  if (!billable(reservation.status, billableRounds.length > 0)) return null;
 
-  const lines = draftLines(reservationId, reservation.partySize);
+  const lines = billableRounds.length
+    ? linesFromOrders(ordered)
+    : draftLines(reservationId, reservation.partySize);
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
   const taxes = [{ label: 'GST 5%', amount: Math.round(subtotal * GST_RATE) }];
 

@@ -5,6 +5,7 @@ import { generateAvailability } from '@/mock/availability';
 import { restaurantById } from '@/mock/restaurants';
 import { seedReservations } from '@/mock/seed';
 import { settleElapsed } from '@/features/reservations/lifecycle';
+import { getOpenState } from '@/features/restaurants/openingHours';
 import {
   assertBookable,
   assertCancellable,
@@ -13,7 +14,7 @@ import {
   assertOfferAcceptable,
   requireRestaurant,
 } from '@/features/reservations/rules';
-import { formatTime } from '@/utils/date';
+import { formatTime, minutesToTime, nowMinutes, todayKey } from '@/utils/date';
 import { AppError } from '@/utils/errors';
 import { localId, reservationCode } from '@/utils/id';
 import { storage, storageKeys } from '@/utils/storage';
@@ -117,6 +118,63 @@ export const reservationService: ReservationService = {
       await writeAll([reservation, ...all]);
       return reservation;
     }, 700);
+  },
+
+  async startWalkIn(restaurantId, partySize) {
+    return simulate(async () => {
+      const restaurant = restaurantById.get(restaurantId);
+      if (!restaurant) throw new AppError('not-found');
+
+      const now = new Date();
+      // Refused only for the things that are true of the room rather than of
+      // the booking: a closed venue has nobody to sit you down, and a party
+      // larger than the room seats is a conversation with the floor rather
+      // than a tap in an app.
+      if (!getOpenState(restaurant, now, nowMinutes()).isOpen) {
+        throw new AppError('restaurant-unavailable', {
+          message: `${restaurant.name} is closed just now.`,
+        });
+      }
+      if (partySize > restaurant.maxPartySize) {
+        throw new AppError('validation', {
+          message: `${restaurant.name} seats up to ${restaurant.maxPartySize} at a table.`,
+        });
+      }
+
+      const all = await readAll();
+      const today = todayKey();
+      // One table at a time. A second walk-in while the first is open would
+      // split a party's rounds across two bills, which nobody would notice
+      // until they came to pay.
+      const open = all.find(
+        (candidate) =>
+          candidate.walkIn &&
+          candidate.restaurantId === restaurantId &&
+          candidate.date === today &&
+          candidate.status === 'confirmed',
+      );
+      if (open) return open;
+
+      const stamp = new Date().toISOString();
+      const reservation: Reservation = {
+        id: localId('rsv'),
+        code: reservationCode(),
+        restaurantId,
+        date: today,
+        time: minutesToTime(nowMinutes()),
+        partySize,
+        seating: 'any',
+        occasion: 'none',
+        notes: '',
+        status: 'confirmed',
+        walkIn: true,
+        createdAt: stamp,
+        updatedAt: stamp,
+      };
+
+      await writeAll([reservation, ...all]);
+      return reservation;
+    }, 600);
   },
 
   async updateReservation(input) {

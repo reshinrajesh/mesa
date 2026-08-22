@@ -83,6 +83,17 @@ import {
   settleTotals,
 } from '@/features/offers/deals';
 import { redirectFor } from '@/features/auth/routing';
+import {
+  billableOrders,
+  canOrder,
+  canWithdraw,
+  cartCount,
+  cartSubtotal,
+  orderedTotal,
+  quantityOf,
+  setQuantity,
+  toPaise,
+} from '@/features/orders/cart';
 import { distanceKm } from '@/utils/geo';
 
 /** First upcoming date on which the venue actually takes bookings. */
@@ -322,6 +333,99 @@ check('somebody who has chosen nothing is sent to the welcome screen', () => {
 check('a signed-in guest is sent out of the auth screens', () => {
   assert.equal(redirectFor('authenticated', true), '/(tabs)');
   assert.equal(redirectFor('authenticated', false), null);
+});
+
+console.log('\n--- dining in ---');
+check('a table you are sitting at can be ordered against straight away', () => {
+  // The gap this closes: ordering was keyed to a booking, so somebody who
+  // walked in had nothing to order against.
+  const today = todayKey();
+  // `canOrder` reads status and date only: a walk-in is confirmed and today,
+  // so it qualifies by being what it is rather than by a special case.
+  assert.equal(canOrder({ status: 'confirmed', date: today }, today), true);
+});
+check('a table you are sitting at cannot be edited into a different one', () => {
+  // Date, time and party are facts once somebody is in the chairs. Offering to
+  // edit them is the app pretending it can rearrange a room it cannot see.
+  const walkIn = { ...bookingAt(), walkIn: true, status: 'confirmed' as const };
+  assert.throws(
+    () => assertModifiable(walkIn, Date.now()),
+    (error: unknown) => {
+      assert.ok(isAppError(error) && error.code === 'reservation-locked');
+      assert.ok(error.message.includes('at the table'));
+      return true;
+    },
+  );
+});
+
+console.log('\n--- ordering at the table ---');
+const tableMenu = {
+  restaurantId: 'rst_ilaya',
+  currency: 'INR',
+  sections: [
+    {
+      id: 's1',
+      title: 'To start',
+      items: [
+        { id: 'm1', name: 'Neer dosa', description: '', price: 90, tags: [] },
+        { id: 'm2', name: 'Ghee roast', description: '', price: 380, tags: [] },
+      ],
+    },
+  ],
+};
+
+check('a menu price becomes money once, and only when a round is sent', () => {
+  // Rupees on a menu, paise on an order line. The one conversion in the app,
+  // and the reason a cart holds ids and quantities rather than amounts.
+  assert.equal(toPaise(90), 9_000);
+  assert.equal(toPaise(380), 38_000);
+  assert.equal(cartSubtotal([{ menuItemId: 'm1', quantity: 2 }], tableMenu), 18_000);
+  assert.equal(cartSubtotal([{ menuItemId: 'm2', quantity: 1 }], tableMenu), 38_000);
+  // A dish that has left the menu contributes nothing rather than NaN.
+  assert.equal(cartSubtotal([{ menuItemId: 'gone', quantity: 3 }], tableMenu), 0);
+});
+check('setting a quantity to zero removes the line rather than keeping an empty one', () => {
+  const one = setQuantity([], 'm1', 2);
+  assert.equal(quantityOf(one, 'm1'), 2);
+  assert.equal(cartCount(one), 2);
+
+  const more = setQuantity(one, 'm2', 1);
+  assert.equal(cartCount(more), 3);
+
+  const gone = setQuantity(more, 'm1', 0);
+  assert.equal(quantityOf(gone, 'm1'), 0);
+  assert.equal(gone.length, 1, 'a zero line was kept');
+  assert.equal(setQuantity(gone, 'm2', -4).length, 0, 'a negative quantity added a line');
+});
+check('a table can only order on the day, and only from a live booking', () => {
+  const today = todayKey();
+  const tomorrow = addDaysToKey(today, 1);
+
+  assert.equal(canOrder({ status: 'confirmed', date: today }, today), true);
+  // The failure this prevents: every booking a guest holds is one tap away on
+  // the bookings list, and ordering to tomorrow's table sends food to a room
+  // nobody is sitting in.
+  assert.equal(canOrder({ status: 'confirmed', date: tomorrow }, today), false);
+  assert.equal(canOrder({ status: 'cancelled', date: today }, today), false);
+  assert.equal(canOrder({ status: 'no-show', date: today }, today), false);
+  // Queueing is not sitting down.
+  assert.equal(canOrder({ status: 'waitlisted', date: today }, today), false);
+  assert.equal(canOrder(null, today), false);
+});
+check('a round can be withdrawn until the kitchen takes it, and not after', () => {
+  assert.equal(canWithdraw({ status: 'placed' }), true);
+  assert.equal(canWithdraw({ status: 'preparing' }), false);
+  assert.equal(canWithdraw({ status: 'served' }), false);
+  assert.equal(canWithdraw({ status: 'cancelled' }), false);
+});
+check('a withdrawn round is not billed', () => {
+  const rounds = [
+    { id: 'o1', round: 1, status: 'served' as const, subtotal: 40_000, lines: [], reservationId: 'r', restaurantId: 'v', placedAt: '' },
+    { id: 'o2', round: 2, status: 'cancelled' as const, subtotal: 15_000, lines: [], reservationId: 'r', restaurantId: 'v', placedAt: '' },
+    { id: 'o3', round: 3, status: 'placed' as const, subtotal: 9_000, lines: [], reservationId: 'r', restaurantId: 'v', placedAt: '' },
+  ];
+  assert.equal(billableOrders(rounds).length, 2);
+  assert.equal(orderedTotal(rounds), 49_000, 'a withdrawn round reached the bill');
 });
 
 console.log('\n--- geo ---');

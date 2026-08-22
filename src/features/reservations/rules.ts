@@ -145,6 +145,15 @@ export function assertJoinable(input: {
 
 /** Can the details of this booking still be changed? */
 export function assertModifiable(reservation: Reservation, now: number): void {
+  // A table somebody is sitting at has nothing to move. The date is today, the
+  // time is when they sat down, and the party is the people in the chairs —
+  // all three are facts rather than choices, and offering to edit them would
+  // be the app pretending it can rearrange a room it cannot see.
+  if (reservation.walkIn) {
+    throw new AppError('reservation-locked', {
+      message: 'You are at the table. Ask the floor if something needs to change.',
+    });
+  }
   // A place in a queue has no time or party size to move: the queue is for one
   // specific sitting. Changing your mind means leaving and joining another.
   if (reservation.status === 'waitlisted') {

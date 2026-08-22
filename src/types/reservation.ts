@@ -134,6 +134,16 @@ export interface Reservation {
   reviewId?: string;
   /** Populated when the venue attaches a note, e.g. a table number. */
   venueMessage?: string;
+  /**
+   * True when the guest walked in rather than booking ahead.
+   *
+   * The record is the same shape either way — it is a table, a party and a
+   * time, and everything downstream (ordering, the bill, the receipt) reads it
+   * identically. What differs is what may be done to it: there is nothing to
+   * cancel two hours before a table you are already sitting at, and nothing to
+   * remind you about.
+   */
+  walkIn?: boolean;
   /** Present exactly when `status === 'waitlisted'`. */
   waitlist?: WaitlistEntry;
 }
