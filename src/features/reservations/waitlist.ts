@@ -120,7 +120,22 @@ const OUTLOOK_COPY: Record<ReturnType<typeof waitlistOutlook>, string> = {
 
 /** "3 ahead of you · tables here sometimes free up" */
 export function waitlistSummary(waitlist: SlotWaitlist): string {
-  return `${queueLabel(waitlist.queueLength)} · ${OUTLOOK_COPY[waitlistOutlook(waitlist.queueLength)]}`;
+  return `${queueDepthLabel(waitlist.queueLength)} · ${OUTLOOK_COPY[waitlistOutlook(waitlist.queueLength)]}`;
+}
+
+/**
+ * The queue behind a slot you have *not* joined, which is a different sentence
+ * from the position of an entry already standing in one.
+ *
+ * `queueLabel(0)` says "A table is yours". That is true of an entry that has
+ * reached the front, and a lie about a sold-out slot nobody has queued for —
+ * which is the ordinary case on a real board, not the edge. The mock's
+ * `queueLengthFor` clamped to one and hid it; a server counts the entries it
+ * has, and for most full slots that count is nought.
+ */
+export function queueDepthLabel(queueLength: number): string {
+  if (queueLength <= 0) return 'You would be first';
+  return queueLabel(queueLength);
 }
 
 /**
@@ -144,5 +159,9 @@ export function queueLabel(position: number): string {
 export function queueLengthFor(seed: string, isPeak: boolean): number {
   const roll = seededUnit(`${seed}|queue`);
   const depth = Math.floor(roll * config.waitlist.maxQueueLength) + (isPeak ? 1 : 0);
-  return Math.min(config.waitlist.maxQueueLength, Math.max(1, depth));
+  // The floor is nought, not one. A table sells out well before anyone queues
+  // for it, so an empty queue behind a full slot is the common case on a real
+  // board — the server reports it, and clamping it here meant the copy for it
+  // was written and never once drawn.
+  return Math.min(config.waitlist.maxQueueLength, Math.max(0, depth));
 }

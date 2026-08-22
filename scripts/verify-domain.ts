@@ -10,6 +10,7 @@ import { applyFilters, decorate, matchesQuery, sortRestaurants } from '@/feature
 import { annotateSlots, recommend, suitableForOccasion } from '@/features/recommendations/engine';
 import {
   isWaitlistable,
+  queueDepthLabel,
   queueLabel,
   waitlistStatus,
   waitlistSummary,
@@ -416,8 +417,25 @@ check('queue depth is deterministic and within bounds', () => {
   );
   for (const slot of first) {
     const depth = slot.waitlist!.queueLength;
-    assert.ok(depth >= 1 && depth <= config.waitlist.maxQueueLength, `depth ${depth}`);
+    assert.ok(depth >= 0 && depth <= config.waitlist.maxQueueLength, `depth ${depth}`);
   }
+});
+check('a full slot nobody has queued for is reachable, and says so', () => {
+  // The floor used to be one, which made `queueDepthLabel`'s nought case
+  // unreachable in the demo while being the ordinary case against the server:
+  // a sitting sells out long before anyone queues for it. Walk a year of
+  // Grano's boards and require both ends to occur.
+  const r = restaurantById.get('rst_grano')!;
+  const depths = new Set<number>();
+  const start = new Date('2026-01-01T00:00:00Z');
+  for (let i = 0; i < 365; i += 1) {
+    const day = new Date(start.getTime() + i * 86_400_000).toISOString().slice(0, 10);
+    for (const slot of generateAvailability(r, day, 2).slots.filter(isWaitlistable)) {
+      depths.add(slot.waitlist!.queueLength);
+    }
+  }
+  assert.ok(depths.has(0), 'no full slot in a year had an empty queue');
+  assert.ok([...depths].some((d) => d > 0), 'no full slot in a year had anyone queued');
 });
 check('closed days and oversize parties have nothing to queue for', () => {
   const closed = restaurantById.get('rst_grano')!;
@@ -478,6 +496,12 @@ check('queue copy names the queue, never a bare zero', () => {
   assert.equal(queueLabel(1), 'You are next');
   assert.equal(queueLabel(4), '4 ahead of you');
   assert.ok(waitlistSummary({ queueLength: 5 }).includes('5 ahead of you'));
+  // The two nought cases are different sentences, and saying the entry's one
+  // about a slot is how a sold-out sitting came to advertise a table.
+  assert.equal(queueDepthLabel(0), 'You would be first');
+  assert.equal(queueDepthLabel(4), queueLabel(4));
+  assert.ok(waitlistSummary({ queueLength: 0 }).startsWith('You would be first'));
+  assert.ok(!waitlistSummary({ queueLength: 0 }).includes('A table is yours'));
 });
 
 console.log('\n--- reservation rules ---');
@@ -585,7 +609,7 @@ check('joining a full slot returns that slot own queue', () => {
   const board = boardWith('rst_grano', 'full');
   const queue = assertJoinable({ ...board, existing: [], now: Date.now() });
   assert.equal(queue.queueLength, board.slot.waitlist!.queueLength);
-  assert.ok(queue.queueLength >= 1);
+  assert.ok(queue.queueLength >= 0);
 });
 check('one place per sitting', () => {
   const board = boardWith('rst_grano', 'full');
