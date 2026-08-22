@@ -1,5 +1,6 @@
 import type { AvailabilityDay, Restaurant, SlotAvailability, TimeSlot, Weekday } from '@/types';
 
+import { headlineOffer } from '@/features/offers/deals';
 import { queueLengthFor } from '@/features/reservations/waitlist';
 import { minutesToTime, nowMinutes, timeToMinutes, todayKey, weekdayOf } from '@/utils/date';
 import { seededUnit } from '@/utils/id';
@@ -68,6 +69,27 @@ function availabilityFor(
 }
 
 /** 19:00–21:00 is when everybody wants a table. */
+/**
+ * What a venue takes off to fill an hour it otherwise would not.
+ *
+ * Deepest early, shallow at peak, nothing at all for a venue running no
+ * percentage offer. This is the whole reason a board is worth reading rather
+ * than just a card: the deal is a property of the hour, and six o'clock is
+ * worth more than eight to both sides.
+ *
+ * A real venue publishes these; the mock derives them from the standing offer
+ * so the board and the card can never advertise different numbers.
+ */
+function discountForTime(restaurant: Restaurant, minutes: number, isPeak: boolean): number {
+  const standing = headlineOffer(restaurant)?.percent ?? 0;
+  if (standing <= 0) return 0;
+  if (isPeak) return Math.max(5, Math.round(standing / 2));
+  // Before six is the quietest hour of a dinner service, and the one a venue
+  // will pay most to fill.
+  if (minutes < 18 * 60) return Math.min(50, standing + 5);
+  return standing;
+}
+
 function isPeakSlot(minutes: number): boolean {
   return minutes >= 19 * 60 && minutes <= 21 * 60;
 }
@@ -132,6 +154,7 @@ export function generateAvailability(
       tablesLeft:
         availability === 'unavailable' ? 0 : availability === 'limited' ? 1 + (seededUnit(`${seed}|t`) > 0.5 ? 1 : 0) : 6,
       hint: hintFor(minutes, availability),
+      discountPercent: discountForTime(restaurant, minutes, peak),
       // Only full slots carry a queue, and only where the venue keeps one.
       waitlist:
         availability === 'unavailable' && restaurant.acceptsWaitlist

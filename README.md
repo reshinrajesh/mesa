@@ -11,7 +11,7 @@ as a single bucket that returns a tiffin room and a Mughlai grill equally badly.
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 102 domain checks + 172 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 109 domain checks + 173 component, screen, hook and service tests
 ```
 
 ---
@@ -34,6 +34,13 @@ converts the entry into a confirmed booking with a code; letting it lapse keeps 
 Cards say so before you commit to a venue: a restaurant with nothing left tonight shows a dashed
 "Full tonight · waitlist" pill where its free times would be, rather than an empty space that reads
 as no availability at all.
+
+**Deals.** A venue advertises what it is running — a flat percentage, a freebie, a bank offer — and
+the card leads with the best of them beside what an evening costs for two. The percentage is a
+property of the *hour*, not the venue: six o'clock is discounted deeper than eight, because that is
+the table the venue is trying to fill, so the board is worth reading rather than just the card. The
+deal follows the booking to the bill and comes off the food **before** the tax, which is how the tax
+is actually charged, and the receipt says what was saved including the GST that never applied.
 
 **Paying.** The venue raises a bill against a table that has eaten; the guest opens it from the
 booking, sees the lines as the venue priced them, adds a tip or declines one, and pays by UPI or
@@ -184,7 +191,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 102 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 109 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -282,7 +289,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 102 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 109 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -572,8 +579,8 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 102 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 172 component, screen, hook, service and HTTP integration tests |
+| `npm run test:domain` | 109 checks over the pure domain layer, the palette and the type scale |
+| `npm test` | 173 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

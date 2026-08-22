@@ -18,6 +18,7 @@ import {
   Skeleton,
   Text,
 } from '@/components/ui';
+import { savedOnBill, settleTotals } from '@/features/offers/deals';
 import { formatPaise, isPayable, TIP_PRESETS, tipFor, totalWithTip } from '@/features/payments/bill';
 import { useBill } from '@/hooks/useBill';
 import { useReservation } from '@/hooks/useReservations';
@@ -56,6 +57,7 @@ export default function BillScreen() {
 
   const payable = isPayable(bill);
   const total = useMemo(() => (bill ? totalWithTip(bill, tip) : 0), [bill, tip]);
+  const saved = useMemo(() => (bill ? savedOnBill(bill) : 0), [bill]);
 
   if (isLoading) {
     return (
@@ -130,12 +132,29 @@ export default function BillScreen() {
               <Text variant="numeric">{formatPaise(bill.subtotal)}</Text>
             </View>
 
+            {/*
+              The discount sits above the tax because that is where it is
+              applied: GST is charged on what the guest pays for the food, not
+              on the menu price they did not pay. Drawing it below would show
+              an order of operations the total does not follow.
+            */}
+            {bill.discount ? (
+              <View style={styles.row}>
+                <Text variant="body" tone="accent" style={{ flex: 1 }}>
+                  {bill.discount.label}
+                </Text>
+                <Text variant="numeric" tone="accent">
+                  −{formatPaise(bill.discount.amount)}
+                </Text>
+              </View>
+            ) : null}
+
             {bill.taxes.map((tax) => (
               <View key={tax.label} style={styles.row}>
                 <Text variant="body" tone="muted" style={{ flex: 1 }}>
                   {tax.label}
                 </Text>
-                <Text variant="numeric">{formatPaise(tax.amount)}</Text>
+                <Text variant="numeric">{formatPaise(settleTotals(bill, 0).taxes)}</Text>
               </View>
             ))}
 
@@ -164,6 +183,14 @@ export default function BillScreen() {
         {settled ? (
           <View style={{ alignItems: 'flex-start', gap: theme.spacing.sm }}>
             <Badge tone="positive" label="Paid" icon="checkmark-circle-outline" />
+            {saved > 0 ? (
+              // The line the whole deal exists for, and the one worth leading a
+              // receipt with. It includes the tax that was not charged on the
+              // discount, because that is money the guest did not spend either.
+              <Text variant="heading" tone="accent">
+                You saved {formatPaise(saved)}
+              </Text>
+            ) : null}
             <Text variant="caption" tone="muted">
               Settled on {new Date(bill.paidAt as string).toLocaleString()}. Nothing further is
               owed.

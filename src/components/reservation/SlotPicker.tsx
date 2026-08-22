@@ -83,8 +83,12 @@ export function SlotPicker({ slots, value, onChange }: SlotPickerProps) {
                             slot.waitlist!.queueLength,
                           )}`
                         : limited
-                          ? `${formatTime(slot.time)}, ${slot.tablesLeft} table${slot.tablesLeft === 1 ? '' : 's'} left`
-                          : `${formatTime(slot.time)}, available${slot.hint ? `, ${slot.hint}` : ''}`
+                          ? `${formatTime(slot.time)}, ${slot.tablesLeft} table${slot.tablesLeft === 1 ? '' : 's'} left${
+                              slot.discountPercent ? `, ${slot.discountPercent} percent off` : ''
+                            }`
+                          : `${formatTime(slot.time)}, available${slot.hint ? `, ${slot.hint}` : ''}${
+                              slot.discountPercent ? `, ${slot.discountPercent} percent off` : ''
+                            }`
                   }
                   scaleTo={0.94}
                   style={[
@@ -123,7 +127,17 @@ export function SlotPicker({ slots, value, onChange }: SlotPickerProps) {
                     {formatTime(slot.time)}
                   </Text>
 
-                  {limited && !selected ? (
+                  {/*
+                    The discount, under the time, in the same slot the "2 left"
+                    hint uses — the two are mutually exclusive in practice, and
+                    where both could apply the deal is what the guest is
+                    choosing between hours for.
+                  */}
+                  {!selected && !unavailable && (slot.discountPercent ?? 0) > 0 ? (
+                    <Text variant="caption" tone="accent" style={{ fontSize: 10 }}>
+                      {slot.discountPercent}% off
+                    </Text>
+                  ) : limited && !selected ? (
                     <Text variant="caption" tone="warning" style={{ fontSize: 10 }}>
                       {slot.tablesLeft} left
                     </Text>

@@ -1,8 +1,10 @@
 import type { Bill, PaymentAuthorization, PaymentMethod, PaymentOrder } from '@/types';
 
-import { totalWithTip } from '@/features/payments/bill';
+import { discountAmount, discountForSlot, headlineOffer, settleTotals } from '@/features/offers/deals';
 import { AppError } from '@/utils/errors';
 import { localId, seededUnit } from '@/utils/id';
+import { generateAvailability } from '@/mock/availability';
+import { restaurantById } from '@/mock/restaurants';
 import { storage, storageKeys } from '@/utils/storage';
 import type { PaymentService } from './contracts';
 import { delay, simulate } from './latency';
@@ -107,6 +109,25 @@ async function ensureBill(reservationId: string): Promise<StoredBill | null> {
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
   const taxes = [{ label: 'GST 5%', amount: Math.round(subtotal * GST_RATE) }];
 
+  // The deal the guest was promised when they booked, honoured now. The board
+  // sets it per slot, so a table booked at six is discounted at six's rate
+  // whatever the venue is advertising by the time the bill arrives.
+  const restaurant = restaurantById.get(reservation.restaurantId);
+  const board = restaurant
+    ? generateAvailability(restaurant, reservation.date, reservation.partySize)
+    : null;
+  const slot = board?.slots.find((candidate) => candidate.time === reservation.time);
+  const percent = restaurant ? discountForSlot(restaurant, slot) : 0;
+  const offer = restaurant ? headlineOffer(restaurant) : null;
+  const discount =
+    percent > 0
+      ? {
+          label: offer?.label ?? `${percent}% off`,
+          percent,
+          amount: discountAmount(subtotal, percent),
+        }
+      : undefined;
+
   const bill: StoredBill = {
     id: localId('bil'),
     reservationId,
@@ -114,9 +135,10 @@ async function ensureBill(reservationId: string): Promise<StoredBill | null> {
     currency: 'INR',
     lines,
     subtotal,
+    discount,
     taxes,
     tip: 0,
-    total: subtotal + taxes[0].amount,
+    total: settleTotals({ subtotal, taxes, discount }, 0).total,
     status: 'open',
     raisedAt: new Date().toISOString(),
     orders: {},
@@ -139,7 +161,7 @@ export const paymentService: PaymentService = {
     if (bill.status === 'paid') throw new AppError('bill-settled');
     if (bill.status === 'void') throw new AppError('bill-void');
 
-    const amount = totalWithTip(bill, tip);
+    const amount = settleTotals(bill, tip).total;
     const order: PaymentOrder = {
       orderId: localId('ord'),
       billId,

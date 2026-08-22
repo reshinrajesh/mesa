@@ -1,5 +1,6 @@
 import type { Bill, BillLine } from '@/types';
 
+import { settleTotals } from '@/features/offers/deals';
 import { AppError } from '@/utils/errors';
 
 /**
@@ -34,10 +35,15 @@ export function tipFor(subtotal: number, share: number): number {
   return Math.floor((subtotal * share) / 100) * 100;
 }
 
-/** Subtotal plus every tax line plus the tip. Paise throughout. */
-export function totalWithTip(bill: Pick<Bill, 'subtotal' | 'taxes'>, tip: number): number {
-  const taxes = bill.taxes.reduce((sum, tax) => sum + tax.amount, 0);
-  return bill.subtotal + taxes + Math.max(0, tip);
+/**
+ * Subtotal, less any discount, plus tax on what is left, plus the tip.
+ *
+ * Delegates to `settleTotals` rather than adding up again: the order of those
+ * operations is the whole rule, and two implementations of it is one more than
+ * can be kept in agreement.
+ */
+export function totalWithTip(bill: Pick<Bill, 'subtotal' | 'taxes' | 'discount'>, tip: number): number {
+  return settleTotals(bill, tip).total;
 }
 
 /**

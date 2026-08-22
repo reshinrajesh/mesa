@@ -75,6 +75,13 @@ import {
   tipFor,
   totalWithTip,
 } from '@/features/payments/bill';
+import {
+  discountAmount,
+  discountForSlot,
+  headlineOffer,
+  savedOnBill,
+  settleTotals,
+} from '@/features/offers/deals';
 import { distanceKm } from '@/utils/geo';
 
 /** First upcoming date on which the venue actually takes bookings. */
@@ -224,6 +231,74 @@ check('a settled bill cannot be paid twice, and says why', () => {
   // A zero bill is not payable either: sending somebody to a gateway to be
   // charged nothing is a failure that looks like a bug in their bank.
   assert.equal(isPayable({ ...openBill, total: 0, subtotal: 0, taxes: [] }), false);
+});
+
+console.log('\n--- deals ---');
+const dealBill = {
+  subtotal: 200_000,
+  taxes: [{ label: 'GST 5%', amount: 10_000 }],
+  discount: { label: 'Flat 20% off', percent: 20, amount: 40_000 },
+};
+
+check('a discount comes off the food before the tax is computed', () => {
+  // The rule the whole feature turns on. Taxing first and discounting after
+  // overcharges by the tax on the discount -- a few rupees, always the venue's
+  // way, and invisible for a year.
+  const totals = settleTotals(dealBill, 0);
+  assert.equal(totals.taxable, 160_000);
+  assert.equal(totals.taxes, 8_000, 'tax was charged on the undiscounted food');
+  assert.equal(totals.total, 168_000);
+
+  const plain = settleTotals({ ...dealBill, discount: undefined }, 0);
+  assert.equal(plain.taxes, 10_000);
+  assert.equal(plain.total, 210_000);
+});
+check('a tip is never discounted', () => {
+  // A tip is not the venue's price to reduce, and taking a percentage off it
+  // would be helping yourself to somebody else's gratuity.
+  assert.equal(settleTotals(dealBill, 20_000).total, 188_000);
+});
+check('what a receipt claims was saved includes the tax not charged', () => {
+  assert.equal(savedOnBill(dealBill), 42_000);
+  assert.equal(savedOnBill({ ...dealBill, discount: undefined }), 0);
+});
+check('a card leads with the best offer, never the smallest', () => {
+  const venue = {
+    offers: [
+      { id: 'a', kind: 'percent' as const, label: '10% off', percent: 10 },
+      { id: 'b', kind: 'percent' as const, label: '25% off', percent: 25 },
+      { id: 'c', kind: 'bank' as const, label: '10% back with HDFC' },
+    ],
+  };
+  assert.equal(headlineOffer(venue)?.percent, 25);
+  assert.equal(headlineOffer({ offers: [venue.offers[2]] })?.kind, 'bank');
+  assert.equal(headlineOffer({ offers: [] }), null);
+});
+check('offers never stack', () => {
+  // The slot's deal or the venue's, whichever applies -- adding them is how a
+  // demo gives away forty-five percent of a bill nobody meant to.
+  const venue = { offers: [{ id: 'a', kind: 'percent' as const, label: '20% off', percent: 20 }] };
+  assert.equal(discountForSlot(venue, { discountPercent: 25 }), 25);
+  assert.equal(discountForSlot(venue, { discountPercent: 0 }), 20);
+  assert.equal(discountForSlot(venue, undefined), 20);
+  assert.equal(discountForSlot({ offers: [] }, { discountPercent: 0 }), 0);
+});
+check('a discount rounds in the guest’s favour and never passes 100%', () => {
+  assert.equal(discountAmount(99_999, 20), 19_999);
+  assert.equal(discountAmount(100_000, 150), 100_000);
+  assert.equal(discountAmount(100_000, 0), 0);
+  assert.equal(discountAmount(0, 20), 0);
+});
+check('a venue offering a percentage discounts its quiet hours at least as much', () => {
+  for (const restaurant of mockRestaurants) {
+    const percent = headlineOffer(restaurant)?.percent ?? 0;
+    if (!percent) continue;
+    const day = generateAvailability(restaurant, firstOpenDay(restaurant.id), 2);
+    const discounts = day.slots.map((slot) => slot.discountPercent ?? 0).filter((n) => n > 0);
+    if (!discounts.length) continue;
+    assert.ok(Math.max(...discounts) <= 50, `${restaurant.id} gives away ${Math.max(...discounts)}%`);
+    assert.ok(Math.min(...discounts) >= 5, `${restaurant.id} advertises a ${Math.min(...discounts)}% deal`);
+  }
 });
 
 console.log('\n--- geo ---');

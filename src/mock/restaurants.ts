@@ -119,6 +119,8 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 96,
     goodFor: ['family', 'friends', 'solo'],
     maxPartySize: 6,
+    costForTwo: 300,
+    offers: [],
     acceptsWaitlist: true,
   },
   {
@@ -154,6 +156,16 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 92,
     goodFor: ['family', 'friends'],
     maxPartySize: 12,
+    costForTwo: 900,
+    offers: [
+      {
+        id: 'rst_dumhouse_off_1',
+        kind: 'percent',
+        label: 'Flat 15% off',
+        percent: 15,
+        terms: 'On the food bill, any evening. Not with other offers.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -188,6 +200,16 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 94,
     goodFor: ['date-night', 'birthday', 'business'],
     maxPartySize: 6,
+    costForTwo: 7600,
+    offers: [
+      {
+        id: 'rst_ilaya_off_1',
+        kind: 'percent',
+        label: '20% off Tuesdays to Thursdays',
+        percent: 20,
+        terms: 'The early sittings midweek. Excludes the pairing.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -215,6 +237,22 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 90,
     goodFor: ['family', 'friends', 'date-night'],
     maxPartySize: 10,
+    costForTwo: 1300,
+    offers: [
+      {
+        id: 'rst_kundapura_off_1',
+        kind: 'percent',
+        label: 'Flat 20% off',
+        percent: 20,
+        terms: 'On the food bill. The board price on fish is what it is.',
+      },
+      {
+        id: 'rst_kundapura_off_2',
+        kind: 'freebie',
+        label: 'Solkadhi on the house',
+        terms: 'One a table, with any main.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -249,6 +287,8 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 93,
     goodFor: ['friends', 'family', 'solo'],
     maxPartySize: 8,
+    costForTwo: 250,
+    offers: [],
     acceptsWaitlist: false,
   },
   {
@@ -284,6 +324,8 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 88,
     goodFor: ['family', 'friends', 'solo'],
     maxPartySize: 10,
+    costForTwo: 500,
+    offers: [],
     acceptsWaitlist: true,
   },
   {
@@ -317,6 +359,22 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 87,
     goodFor: ['friends', 'date-night', 'business'],
     maxPartySize: 12,
+    costForTwo: 2200,
+    offers: [
+      {
+        id: 'rst_emberclay_off_1',
+        kind: 'percent',
+        label: '25% off before 7pm',
+        percent: 25,
+        terms: 'Seated by seven, and the kitchen tells you when.',
+      },
+      {
+        id: 'rst_emberclay_off_2',
+        kind: 'bank',
+        label: '10% back with HDFC cards',
+        terms: 'Up to ₹500. The bank’s offer, not ours.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -343,6 +401,16 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 85,
     goodFor: ['friends', 'family'],
     maxPartySize: 14,
+    costForTwo: 800,
+    offers: [
+      {
+        id: 'rst_guntur_off_1',
+        kind: 'percent',
+        label: 'Flat 10% off',
+        percent: 10,
+        terms: 'Every day. The chilli count is not negotiable.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -378,6 +446,15 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 84,
     goodFor: ['family', 'date-night', 'friends'],
     maxPartySize: 8,
+    costForTwo: 1100,
+    offers: [
+      {
+        id: 'rst_backwater_off_1',
+        kind: 'freebie',
+        label: '1+1 on toddy',
+        terms: 'Before eight, one a guest.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -419,6 +496,8 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 89,
     goodFor: ['friends', 'solo', 'business', 'family'],
     maxPartySize: 12,
+    costForTwo: 900,
+    offers: [],
     acceptsWaitlist: true,
   },
   {
@@ -453,6 +532,16 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 86,
     goodFor: ['solo', 'friends', 'business'],
     maxPartySize: 6,
+    costForTwo: 500,
+    offers: [
+      {
+        id: 'rst_filterfoam_off_1',
+        kind: 'percent',
+        label: '15% off before noon',
+        percent: 15,
+        terms: 'On coffee and the counter, weekdays.',
+      },
+    ],
     acceptsWaitlist: false,
   },
   {
@@ -479,6 +568,8 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 83,
     goodFor: ['solo', 'family', 'friends'],
     maxPartySize: 4,
+    costForTwo: 200,
+    offers: [],
     acceptsWaitlist: false,
   },
   {
@@ -522,6 +613,22 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 91,
     goodFor: ['friends', 'birthday', 'date-night'],
     maxPartySize: 16,
+    costForTwo: 2400,
+    offers: [
+      {
+        id: 'rst_copperkettle_off_1',
+        kind: 'percent',
+        label: '20% off on weekdays',
+        percent: 20,
+        terms: 'Monday to Thursday, food and beer both.',
+      },
+      {
+        id: 'rst_copperkettle_off_2',
+        kind: 'bank',
+        label: 'Flat ₹150 off with UPI',
+        terms: 'On bills over ₹1,500.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -560,6 +667,8 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 88,
     goodFor: ['date-night', 'business', 'birthday'],
     maxPartySize: 4,
+    costForTwo: 9800,
+    offers: [],
     acceptsWaitlist: true,
   },
   {
@@ -601,6 +710,16 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 82,
     goodFor: ['friends', 'date-night', 'family'],
     maxPartySize: 10,
+    costForTwo: 1800,
+    offers: [
+      {
+        id: 'rst_forno_off_1',
+        kind: 'percent',
+        label: 'Flat 15% off',
+        percent: 15,
+        terms: 'On the food bill, courtyard included.',
+      },
+    ],
     acceptsWaitlist: true,
   },
   {
@@ -642,6 +761,16 @@ const inventedRestaurants: Restaurant[] = [
     popularityScore: 79,
     goodFor: ['family', 'friends'],
     maxPartySize: 20,
+    costForTwo: 900,
+    offers: [
+      {
+        id: 'rst_whitefield_off_1',
+        kind: 'percent',
+        label: '20% off before 7pm',
+        percent: 20,
+        terms: 'The courtyard fills late; this is why.',
+      },
+    ],
     acceptsWaitlist: true,
   },
 ];
