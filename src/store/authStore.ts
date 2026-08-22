@@ -23,8 +23,8 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (input: {
     name: string;
-    phone: string;
     password: string;
+    phone?: string;
     email?: string;
   }) => Promise<void>;
   signInWithProvider: (provider: 'google' | 'apple') => Promise<void>;

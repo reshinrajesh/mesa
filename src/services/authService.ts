@@ -79,7 +79,7 @@ export const authService: AuthService = {
         // An account registered by phone has no address to show, and inventing
         // one to fill the field would put a mailbox nobody owns on a profile.
         email: input.email?.trim().toLowerCase() ?? '',
-        phone: input.phone.trim(),
+        phone: input.phone?.trim() ?? '',
         favoriteCuisines: [],
         dietary: [],
         savedPlaces: [],

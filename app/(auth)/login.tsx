@@ -1,21 +1,54 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { ScrollView, View } from 'react-native';
 
-import { loginSchema, type LoginValues } from '@/validation/schemas';
-import { Button, Input, Pressable, Screen, ScreenHeader, Text } from '@/components/ui';
+import {
+  loginSchema,
+  mobileLoginSchema,
+  type LoginValues,
+  type MobileLoginValues,
+} from '@/validation/schemas';
+import {
+  Button,
+  Input,
+  Pressable,
+  Screen,
+  ScreenHeader,
+  SegmentedControl,
+  Text,
+} from '@/components/ui';
+import { authService } from '@/services';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/store/uiStore';
 import { useTheme } from '@/theme';
 import { toAppError } from '@/utils/errors';
 
+/**
+ * Sign in, two ways.
+ *
+ * Email and a password, or a mobile number and a code. Both are on the switch
+ * rather than one being the screen and the other a link underneath it, because
+ * a link underneath reads as the lesser option and the code is the way most
+ * people here will actually get in.
+ *
+ * The mobile side has its own form. Sharing one would mean a password field
+ * that is required half the time, which is the shape of validation nobody can
+ * follow.
+ */
 export default function LoginScreen() {
   const theme = useTheme();
   const router = useRouter();
   const signIn = useAuthStore((s) => s.signIn);
   const pending = useAuthStore((s) => s.pending);
+  // The welcome screen's "Continue with mobile" lands here with the switch
+  // already thrown, rather than on a second screen that asks the same
+  // question with the same field.
+  const params = useLocalSearchParams<{ method?: string }>();
+  const [method, setMethod] = React.useState<'email' | 'mobile'>(
+    params.method === 'mobile' ? 'mobile' : 'email',
+  );
 
   const {
     control,
@@ -28,6 +61,25 @@ export default function LoginScreen() {
     // half-typed email is noise, and it makes the form feel like it is nagging.
     mode: 'onBlur',
   });
+
+  const mobileForm = useForm<MobileLoginValues>({
+    resolver: zodResolver(mobileLoginSchema),
+    defaultValues: { phone: '' },
+    mode: 'onBlur',
+  });
+
+  const onSendCode = async (values: MobileLoginValues) => {
+    const destination = values.phone.trim();
+    try {
+      // Sent from here so a number the gateway refuses fails while the guest
+      // is still looking at the field they typed it into.
+      await authService.requestOtp(destination);
+      router.push({ pathname: '/(auth)/otp', params: { destination } });
+    } catch (error) {
+      const app = toAppError(error);
+      toast({ title: app.title, message: app.message, tone: 'danger' });
+    }
+  };
 
   const onSubmit = async (values: LoginValues) => {
     try {
@@ -58,6 +110,50 @@ export default function LoginScreen() {
           </Text>
         </View>
 
+        <SegmentedControl
+          options={[
+            { value: 'email', label: 'Email' },
+            { value: 'mobile', label: 'Mobile' },
+          ]}
+          value={method}
+          onChange={setMethod}
+        />
+
+        {method === 'mobile' ? (
+          <>
+            <Controller
+              control={mobileForm.control}
+              name="phone"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  label="Mobile number"
+                  icon="call-outline"
+                  placeholder="+91 98765 43210"
+                  hint="We will send a six-digit code. No password needed."
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  error={mobileForm.formState.errors.phone?.message}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  returnKeyType="go"
+                  onSubmitEditing={mobileForm.handleSubmit(onSendCode)}
+                />
+              )}
+            />
+
+            <Button
+              label="Send the code"
+              size="lg"
+              fullWidth
+              loading={mobileForm.formState.isSubmitting}
+              onPress={mobileForm.handleSubmit(onSendCode)}
+              style={{ marginTop: theme.spacing.sm }}
+            />
+          </>
+        ) : (
+          <>
         <Controller
           control={control}
           name="email"
@@ -120,15 +216,8 @@ export default function LoginScreen() {
           style={{ marginTop: theme.spacing.sm }}
         />
 
-        <Pressable
-          onPress={() => router.push('/(auth)/mobile')}
-          accessibilityRole="button"
-          style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center' }}
-        >
-          <Text variant="label" tone="muted">
-            Send me a code instead
-          </Text>
-        </Pressable>
+          </>
+        )}
 
         {/* The demo credentials, printed rather than hidden — this build has
             no backend, and a login screen you cannot get past is a dead end. */}

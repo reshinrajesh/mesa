@@ -124,11 +124,13 @@ There is no backend. The login screen prints this, and accepts:
 Any other email with an 8-character password also signs in, as does Google, Apple or
 **Browse without an account**.
 
-**Continue with mobile** is the other way in, and the one this market expects: one field, a
-six-digit code, no password. The same button signs you in or signs you up — a number the server
-knows gets a session, a number it does not gets an account — because which of the two it is belongs
-to the server and not to a question asked before anybody has typed anything. On the sign-up form the
-mobile number is the identifier and the email is genuinely optional.
+**Both screens offer two ways in.** Sign in with an email and a password, or with a mobile number
+and a six-digit code; register with either, chosen on a switch at the top of the form. Neither is
+the one the app insists on, and the field you did not choose is not on screen to be got wrong.
+
+Signing in by mobile is also signing up by mobile: a number the server knows gets a session, a
+number it does not gets an account. Which of the two it is belongs to the server rather than to a
+question asked before anybody has typed anything.
 
 A fresh install seeds itself so nothing is empty on first run: three saved restaurants, two upcoming
 bookings, one live waitlist entry, four past ones, five notifications. Seeds apply only when nothing

@@ -70,7 +70,7 @@ export const authServiceHttp: AuthService = {
         body: {
           ...input,
           email: input.email?.trim().toLowerCase() || undefined,
-          phone: input.phone.trim(),
+          phone: input.phone?.trim() || undefined,
         },
         authenticated: false,
       }),

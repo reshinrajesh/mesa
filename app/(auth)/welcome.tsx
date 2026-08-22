@@ -88,7 +88,7 @@ export default function WelcomeScreen() {
           fullWidth
           size="lg"
           icon="call-outline"
-          onPress={() => router.push('/(auth)/mobile')}
+          onPress={() => router.push({ pathname: '/(auth)/login', params: { method: 'mobile' } })}
         />
 
         <Button

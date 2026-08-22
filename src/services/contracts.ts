@@ -79,17 +79,21 @@ export interface AuthService {
   restore(): Promise<{ user: User | null; kind: 'authenticated' | 'guest' | 'anonymous' }>;
   signIn(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }>;
   /**
-   * Register. The phone number is the identifier; an email is optional.
+   * Register with a mobile number or an email address. Either will do.
    *
-   * That way round because of where this ships: a mobile number is what
-   * people here have and give, and an email is a second thing to remember.
-   * The server derives an internal address for an account that has none, which
-   * is Frappe's constraint rather than the guest's problem.
+   * Both are optional in the type and **at least one is required in fact**,
+   * which the server enforces and the sign-up form states with a switch. The
+   * type cannot say "one of these two" without splitting the method in half,
+   * and a caller passing neither gets a field error rather than a crash.
+   *
+   * An account registered by phone alone has no address to be reached at, so
+   * the server derives an unroutable internal one: Frappe names users by
+   * email, and that is its constraint rather than the guest's problem.
    */
   signUp(input: {
     name: string;
-    phone: string;
     password: string;
+    phone?: string;
     email?: string;
   }): Promise<{ user: User; tokens: AuthTokens }>;
   requestPasswordReset(email: string): Promise<{ sentTo: string }>;

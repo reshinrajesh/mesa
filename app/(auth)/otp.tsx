@@ -43,7 +43,7 @@ export default function OtpScreen() {
     if (!destination) {
       // Nothing to send a code to. Back to the field where a number is typed,
       // rather than a screen asking for a code that was never sent.
-      router.replace('/(auth)/mobile');
+      router.replace({ pathname: '/(auth)/login', params: { method: 'mobile' } });
       return;
     }
     authService
