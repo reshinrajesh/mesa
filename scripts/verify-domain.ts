@@ -399,7 +399,13 @@ check('a walk-in venue offers no queue at all', () => {
 });
 check('queue depth is deterministic and within bounds', () => {
   const r = restaurantById.get('rst_grano')!;
-  const date = firstOpenDay('rst_grano');
+  // A night that actually sells something out, rather than whichever night is
+  // open first. Demand belongs to the evening, so Grano's next open night
+  // sometimes has no full slot at all and this check is left with nothing to
+  // measure — on three days in a year, which is exactly often enough to look
+  // like a mystery rather than a bug. It failed on 2026-08-19 and passed again
+  // on the 20th. `boardWith` looks three weeks out for a night that qualifies.
+  const date = boardWith('rst_grano', 'full').request.date;
   const first = generateAvailability(r, date, 2).slots.filter(isWaitlistable);
   const second = generateAvailability(r, date, 2).slots.filter(isWaitlistable);
   assert.ok(first.length > 0, 'expected at least one queueable slot');
