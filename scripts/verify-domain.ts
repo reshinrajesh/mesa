@@ -67,6 +67,14 @@ import {
   toDateKey,
 } from '@/utils/date';
 import { formatCurrency, formatDistance, joinMeta, priceLabel } from '@/utils/format';
+import {
+  assertPayable,
+  formatPaise,
+  isPayable,
+  TIP_PRESETS,
+  tipFor,
+  totalWithTip,
+} from '@/features/payments/bill';
 import { distanceKm } from '@/utils/geo';
 
 /** First upcoming date on which the venue actually takes bookings. */
@@ -156,6 +164,66 @@ check('a real venue is never given an invented review', () => {
     assert.ok(mockReviews.length > 0, 'the invented dataset lost its reviews');
     assert.equal(mockRestaurants.length, 16);
   }
+});
+
+console.log('\n--- the bill ---');
+const openBill = {
+  id: 'bil_1',
+  reservationId: 'rsv_1',
+  restaurantId: 'rst_ilaya',
+  currency: 'INR',
+  lines: [{ id: 'l1', name: 'Mains', quantity: 2, unitPrice: 62_000 }],
+  subtotal: 124_000,
+  taxes: [{ label: 'GST 5%', amount: 6_200 }],
+  tip: 0,
+  total: 130_200,
+  status: 'open' as const,
+  raisedAt: new Date().toISOString(),
+};
+
+check('a bill in paise formats as rupees and paise, grouped the Indian way', () => {
+  // The whole reason bills are integers: a total drawn as ₹1,302 when ₹1,302.75
+  // is charged is a small lie told at the exact moment somebody is paying.
+  assert.equal(formatPaise(130_200), '₹1,302.00');
+  assert.equal(formatPaise(130_275), '₹1,302.75');
+  assert.equal(formatPaise(9_000), '₹90.00');
+  assert.equal(formatPaise(14_500_000), '₹1,45,000.00');
+  assert.equal(formatPaise(0), '₹0.00');
+});
+check('the total is the venue’s arithmetic plus the guest’s tip', () => {
+  assert.equal(totalWithTip(openBill, 0), 130_200);
+  assert.equal(totalWithTip(openBill, 10_000), 140_200);
+  // A negative tip is not a discount the guest gets to award themselves.
+  assert.equal(totalWithTip(openBill, -5_000), 130_200);
+});
+check('tip presets land on whole rupees, and never above the percentage', () => {
+  for (const share of TIP_PRESETS) {
+    const tip = tipFor(openBill.subtotal, share);
+    assert.equal(tip % 100, 0, `${share} gave ${tip} paise, which is not a whole rupee`);
+    assert.ok(tip <= openBill.subtotal * share, `${share} rounded up, to ${tip}`);
+  }
+  assert.equal(TIP_PRESETS[0], 0, 'declining a tip must be the first option offered');
+});
+check('a settled bill cannot be paid twice, and says why', () => {
+  assert.equal(isPayable(openBill), true);
+  assert.equal(isPayable(null), false);
+
+  const paid = { ...openBill, status: 'paid' as const };
+  assert.equal(isPayable(paid), false);
+  assert.throws(() => assertPayable(paid), (error: unknown) => {
+    assert.ok(isAppError(error) && error.code === 'bill-settled');
+    return true;
+  });
+
+  const voided = { ...openBill, status: 'void' as const };
+  assert.throws(() => assertPayable(voided), (error: unknown) => {
+    assert.ok(isAppError(error) && error.code === 'bill-void');
+    return true;
+  });
+
+  // A zero bill is not payable either: sending somebody to a gateway to be
+  // charged nothing is a failure that looks like a bug in their bank.
+  assert.equal(isPayable({ ...openBill, total: 0, subtotal: 0, taxes: [] }), false);
 });
 
 console.log('\n--- geo ---');

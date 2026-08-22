@@ -2,12 +2,16 @@ import type {
   AppNotification,
   AuthTokens,
   AvailabilityDay,
+  Bill,
   CreateReservationInput,
   CreateReviewInput,
   JoinWaitlistInput,
   Menu,
   NotificationPreferences,
   Page,
+  PaymentAuthorization,
+  PaymentMethod,
+  PaymentOrder,
   RatingBreakdown,
   Reservation,
   Restaurant,
@@ -123,6 +127,34 @@ export interface NotificationService {
   cancelWaitlistAlert(reservationId: string): Promise<void>;
   /** Registers for remote push. A no-op until a push backend exists. */
   registerForPush(): Promise<string | null>;
+}
+
+/**
+ * The bill at the table, and moving money for it.
+ *
+ * Shaped like Razorpay's flow rather than like the mock, because the mock is
+ * the thing that gets thrown away: the server mints an order with the amount
+ * fixed in it, the gateway hands back a signed payment, and the server
+ * verifies that signature before a bill is marked paid. A client that could
+ * report its own success is a client that can pay one rupee for a three
+ * thousand rupee dinner.
+ *
+ * `checkout` is the only method that stands in for a screen the app does not
+ * own. In the mock it resolves after a beat; against a real gateway it is
+ * where the Razorpay SDK takes over and comes back with a payment id.
+ */
+export interface PaymentService {
+  /** The bill for a booking, or null when the venue has not raised one. */
+  getBill(reservationId: string): Promise<Bill | null>;
+  /**
+   * Mint an order for this bill including the tip the guest chose. The amount
+   * is the server's arithmetic, not the client's.
+   */
+  createOrder(billId: string, tip: number): Promise<PaymentOrder>;
+  /** Hand the guest to the gateway. Resolves with what the gateway signed. */
+  checkout(order: PaymentOrder, method: PaymentMethod): Promise<PaymentAuthorization>;
+  /** Server-side verification. Returns the settled bill, or throws. */
+  confirmPayment(authorization: PaymentAuthorization): Promise<Bill>;
 }
 
 export interface ReviewService {

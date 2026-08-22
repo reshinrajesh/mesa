@@ -99,6 +99,7 @@ export const storageKeys = {
   session: 'mesa.session-kind',
   activeLocation: 'mesa.active-location',
   reviews: 'mesa.reviews',
+  bills: 'mesa.bills',
 } as const;
 
 export const secureKeys = {
