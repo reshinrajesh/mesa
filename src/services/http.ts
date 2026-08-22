@@ -1,5 +1,5 @@
 import { config } from '@/constants/config';
-import { AppError, toAppError } from '@/utils/errors';
+import { AppError, isErrorCode, toAppError } from '@/utils/errors';
 import { log } from '@/utils/log';
 import { secureKeys, secureStorage } from '@/utils/storage';
 
@@ -36,7 +36,29 @@ function buildUrl(path: string, params?: RequestOptions['params']): string {
   return url.toString();
 }
 
-function errorForStatus(status: number, detail?: string): AppError {
+/**
+ * The refusal the user reads, from the code the server names or the status it
+ * used.
+ *
+ * The status alone cannot carry this. There are seventeen `ErrorCode`s and
+ * seven statuses worth mapping, so `no-availability`, `slot-taken`,
+ * `restaurant-unavailable`, `reservation-locked`, `waitlist-closed` and
+ * `waitlist-duplicate` all travel as 409 and would all have read "That time
+ * just went" — including the two that are about a queue, where no time went
+ * anywhere. `waitlist-offer-expired` had no route at all.
+ *
+ * So a body `code` wins when the app has copy for it, and the status decides
+ * only when there is none — an older server, a proxy's own error page, or a
+ * provider fault that never reached the app's own error handler. This is the
+ * one place the client gives way rather than the server, because no status
+ * code could have filled the hole.
+ *
+ * 410 is deliberately absent from the fallbacks below. It means "the hold you
+ * had has expired" on exactly one endpoint and nothing in particular anywhere
+ * else, so it is carried by the code in the body or not at all.
+ */
+function errorForStatus(status: number, detail?: string, code?: unknown): AppError {
+  if (isErrorCode(code)) return new AppError(code, { debugMessage: detail });
   if (status === 401) return new AppError('unauthorized', { debugMessage: detail });
   if (status === 403) return new AppError('forbidden', { debugMessage: detail });
   if (status === 404) return new AppError('not-found', { debugMessage: detail });
@@ -82,7 +104,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
         parsed && typeof parsed === 'object' && 'message' in parsed
           ? String((parsed as { message: unknown }).message)
           : text.slice(0, 300);
-      const error = errorForStatus(response.status, detail);
+      const code =
+        parsed && typeof parsed === 'object' && 'code' in parsed
+          ? (parsed as { code: unknown }).code
+          : undefined;
+      const error = errorForStatus(response.status, detail, code);
       log.error('http', `${method} ${path} failed`, { status: response.status, detail });
       throw error;
     }

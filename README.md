@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 95 domain checks + 160 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 95 domain checks + 168 component, screen, hook and service tests
 ```
 
 ---
@@ -293,6 +293,18 @@ server could route and a header that never got sent. It covers the query flatten
 token, JSON round-tripping, path encoding, the mock/HTTP switch itself, and that a 409 becomes "That
 time just went" while the provider's `PG::UndefinedTable` reaches the log and never the screen.
 
+**A refusal is named by the server, not guessed from its status.** There are seventeen `ErrorCode`s
+and seven statuses worth mapping, so `slot-taken`, `no-availability`, `restaurant-unavailable`,
+`reservation-locked`, `waitlist-closed` and `waitlist-duplicate` all arrive as 409 — and every one of
+them used to read "That time just went", including the two about a queue, where no time went
+anywhere. `waitlist-offer-expired` had no status of its own at all. So `request()` prefers a `code`
+in the error body over the status, and falls back to the status when the body names nothing: an
+older server, a proxy's own error page, or a fault that never reached the app's error handler. The
+code is checked against the copy table rather than trusted, because a server naming its own code
+decides which sentence the user reads. This is the one place the client gives way to the backend's
+shape rather than the other way round, and it is the only one — no status code could have carried
+the distinction.
+
 It also holds the three decisions above: that a 500 from `/auth/sign-out` still clears the keychain,
 that a dead preferences endpoint still schedules the reminder, and that no write carrying a token
 reaches the plaintext store. And it asserts that both implementations of every contract expose the
@@ -497,7 +509,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm run test:domain` | 95 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 160 component, screen, hook, service and HTTP integration tests |
+| `npm test` | 168 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 
