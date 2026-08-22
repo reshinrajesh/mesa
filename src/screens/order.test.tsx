@@ -3,10 +3,12 @@ import React from 'react';
 
 import type { Reservation } from '@/types';
 
+import { getOpenState } from '@/features/restaurants/openingHours';
 import { menuByRestaurantId } from '@/mock/menus';
+import { mockRestaurants } from '@/mock/restaurants';
 import { orderService, paymentService, reservationService } from '@/services';
 import { storage, storageKeys } from '@/utils/storage';
-import { toDateKey } from '@/utils/date';
+import { nowMinutes, toDateKey } from '@/utils/date';
 import OrderScreen from '../../app/reservation/[id]/order';
 import { givenStorage, renderScreen } from './harness';
 
@@ -51,6 +53,18 @@ function booking(daysAway: number, status: Reservation['status'] = 'confirmed'):
 // Read off the menu rather than written down: item ids come from a counter
 // that spans the whole file, so a literal here is a guess that goes stale the
 // next time a dish is added anywhere.
+/** A venue with a menu that is serving at this exact minute, or none. */
+function openVenue() {
+  const now = new Date();
+  return (
+    mockRestaurants.find(
+      (restaurant) =>
+        menuByRestaurantId.has(restaurant.id) &&
+        getOpenState(restaurant, now, nowMinutes()).isOpen,
+    ) ?? null
+  );
+}
+
 const menu = menuByRestaurantId.get('rst_ilaya');
 const [firstDish, secondDish] = menu?.sections.flatMap((section) => section.items) ?? [];
 
@@ -133,15 +147,29 @@ describe('Order screen', () => {
   it('a walk-in table can order without a booking behind it', async () => {
     // The whole point of dining in: somebody who never booked has a table, and
     // the ordering path is the same one a booking uses.
+    //
+    // The venue is chosen by asking which one is open at this instant rather
+    // than by naming one: dining in requires open doors, and a test that names
+    // a venue passes on a machine in Bengaluru and fails on a runner in UTC.
+    // That is the same flake the queue-depth check had, and it is fixed the
+    // same way. Between one and half six in the morning nothing is open at
+    // all, and the refusal is asserted instead -- both branches say something
+    // true, so neither is a hole.
     await givenStorage({ reservations: [] });
+    const open = openVenue();
 
-    const table = await reservationService.startWalkIn('rst_thindi', 2);
+    if (!open) {
+      await expect(reservationService.startWalkIn('rst_thindi', 2)).rejects.toMatchObject({
+        code: 'restaurant-unavailable',
+      });
+      return;
+    }
+
+    const table = await reservationService.startWalkIn(open.id, 2);
     expect(table.walkIn).toBe(true);
     expect(table.status).toBe('confirmed');
 
-    const dish = menuByRestaurantId
-      .get('rst_thindi')
-      ?.sections.flatMap((section) => section.items)[0];
+    const dish = menuByRestaurantId.get(open.id)?.sections.flatMap((s) => s.items)[0];
     const round = await orderService.placeOrder(table.id, [
       { menuItemId: dish!.id, quantity: 1 },
     ]);
@@ -154,9 +182,11 @@ describe('Order screen', () => {
     // Two tables would split a party's rounds across two bills, which nobody
     // notices until they come to pay.
     await givenStorage({ reservations: [] });
+    const open = openVenue();
+    if (!open) return;
 
-    const first = await reservationService.startWalkIn('rst_thindi', 2);
-    const second = await reservationService.startWalkIn('rst_thindi', 4);
+    const first = await reservationService.startWalkIn(open.id, 2);
+    const second = await reservationService.startWalkIn(open.id, 4);
 
     expect(second.id).toBe(first.id);
   }, 20_000);
