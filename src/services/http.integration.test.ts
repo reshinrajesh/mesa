@@ -441,6 +441,58 @@ describe('error mapping', () => {
     });
   });
 
+  /**
+   * The six refusals that share 409, and the one that had no status at all.
+   *
+   * Mapping by status alone told a guest who was already in a queue that the
+   * time they wanted had just gone, and said the same about a venue that had
+   * closed and a booking inside its change lock. The server names the code in
+   * the body; the client reads it.
+   */
+  it.each([
+    [409, 'waitlist-duplicate', 'You are already on this list'],
+    [409, 'waitlist-closed', 'No waitlist for that time'],
+    [409, 'reservation-locked', 'Too close to the booking'],
+    [409, 'restaurant-unavailable', 'Not taking bookings'],
+    [409, 'no-availability', 'Nothing free at that time'],
+    [410, 'waitlist-offer-expired', 'That table has gone'],
+  ])('lets the body name %i as %s', async (status, code, title) => {
+    reply = { status, body: { code, message: 'raw provider detail' } };
+
+    // The title as well as the code: the whole point is which sentence the
+    // guest reads, and every one of these read "That time just went" before.
+    await expect(reservationServiceHttp.getReservationById('rsv_1')).rejects.toMatchObject({
+      code,
+      title,
+    });
+  });
+
+  it('keeps the status mapping when the body names nothing', async () => {
+    // An older server, a proxy's own error page, or a fault that never reached
+    // the app's error handler. The 409 default stays what it was.
+    reply = { status: 409, body: { message: 'no code here' } };
+
+    await expect(reservationServiceHttp.getReservationById('rsv_1')).rejects.toMatchObject({
+      code: 'slot-taken',
+    });
+  });
+
+  it('refuses a code it has no copy for', async () => {
+    // A whitelist rather than a passthrough: an unrecognised code would render
+    // an undefined title, and a server should not get to invent sentences.
+    reply = { status: 409, body: { code: 'teapot-on-fire', message: 'invented' } };
+
+    await expect(reservationServiceHttp.getReservationById('rsv_1')).rejects.toMatchObject({
+      code: 'slot-taken',
+    });
+
+    reply = { status: 418, body: { code: { nested: 'object' } } };
+
+    await expect(reservationServiceHttp.getReservationById('rsv_1')).rejects.toMatchObject({
+      code: 'unknown',
+    });
+  });
+
   it('never lets provider text reach the user', async () => {
     reply = { status: 500, body: { message: 'PG::UndefinedTable at /api/reservations' } };
 

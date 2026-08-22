@@ -132,6 +132,21 @@ const COPY: Record<ErrorCode, CopyEntry> = {
   },
 };
 
+/**
+ * Whether a string off the wire names a code this app has copy for.
+ *
+ * Read from `COPY` rather than written out again, so a code added to the union
+ * is accepted here the day its copy exists and never before: an `ErrorCode`
+ * with no entry would render an undefined title.
+ *
+ * This is a whitelist on purpose. A server naming its own code decides which
+ * of seventeen sentences the user reads, so an unrecognised one falls back to
+ * the status mapping rather than being trusted.
+ */
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(COPY, value);
+}
+
 export class AppError extends Error {
   readonly code: ErrorCode;
   readonly title: string;
