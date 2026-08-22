@@ -24,7 +24,7 @@ function reservation(id: string, daysAway: number, overrides: Partial<Reservatio
   return {
     id,
     code: 'ABC234',
-    restaurantId: 'rst_grano',
+    restaurantId: 'rst_ilaya',
     date: toDateKey(at),
     time: `${pad(at.getHours())}:${pad(at.getMinutes())}`,
     partySize: 2,

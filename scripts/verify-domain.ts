@@ -60,7 +60,7 @@ import {
   todayKey,
   toDateKey,
 } from '@/utils/date';
-import { formatDistance, joinMeta, priceLabel } from '@/utils/format';
+import { formatCurrency, formatDistance, joinMeta, priceLabel } from '@/utils/format';
 import { distanceKm } from '@/utils/geo';
 
 /** First upcoming date on which the venue actually takes bookings. */
@@ -108,13 +108,25 @@ check('joinMeta drops nulls without leaving separators', () => {
 check('priceLabel clamps', () => {
   assert.equal(priceLabel(3), '$$$');
 });
+check('rupees are grouped the Indian way', () => {
+  // Not `₹1,450` by luck: the grouping is last-three-then-pairs, so a lakh is
+  // where a western formatter and this one part company, and every menu in the
+  // app is priced in rupees.
+  assert.equal(formatCurrency(90), '₹90');
+  assert.equal(formatCurrency(3800), '₹3,800');
+  assert.equal(formatCurrency(145000), '₹1,45,000');
+  assert.equal(formatCurrency(1234567), '₹12,34,567');
+  // A venue pricing in something else still formats that way.
+  assert.equal(formatCurrency(34, 'EUR'), '€34');
+});
 
 console.log('\n--- geo ---');
-check('distance between two Lisbon points is plausible', () => {
-  const a = { latitude: 38.7176, longitude: -9.1489 };
-  const b = { latitude: 38.7069, longitude: -9.1447 };
+check('distance between two Bengaluru points is plausible', () => {
+  // Indiranagar to Koramangala, which is about five kilometres by air.
+  const a = { latitude: 12.9784, longitude: 77.6408 };
+  const b = { latitude: 12.9352, longitude: 77.6245 };
   const km = distanceKm(a, b);
-  assert.ok(km > 1 && km < 2, `expected ~1.2km, got ${km}`);
+  assert.ok(km > 4 && km < 6, `expected ~5km, got ${km}`);
 });
 
 console.log('\n--- opening hours ---');
@@ -127,7 +139,7 @@ check('every restaurant produces a usable open state at every hour', () => {
   }
 });
 check('a past-midnight bar reads as open at 00:30', () => {
-  const bar = restaurantById.get('rst_maiz')!;
+  const bar = restaurantById.get('rst_copperkettle')!;
   // Friday 00:30 — Thursday's span runs to 25:00.
   const friday = new Date(2026, 7, 14); // 14 Aug 2026 is a Friday
   assert.equal(friday.getDay(), 5);
@@ -143,14 +155,14 @@ check('weeklyHours returns 7 rows starting Monday', () => {
 
 console.log('\n--- availability ---');
 check('slots are deterministic across calls', () => {
-  const r = restaurantById.get('rst_grano')!;
-  const date = firstOpenDay('rst_grano');
+  const r = restaurantById.get('rst_ilaya')!;
+  const date = firstOpenDay('rst_ilaya');
   const a = generateAvailability(r, date, 2);
   const b = generateAvailability(r, date, 2);
   assert.deepEqual(a.slots, b.slots);
 });
 check('closed days return a reason and no slots', () => {
-  const r = restaurantById.get('rst_grano')!; // closed Mondays
+  const r = restaurantById.get('rst_ilaya')!; // closed Mondays
   let found = false;
   for (let i = 0; i < 8; i += 1) {
     const key = addDaysToKey(todayKey(), i);
@@ -163,15 +175,15 @@ check('closed days return a reason and no slots', () => {
   assert.ok(found, 'expected at least one closed day in the next week');
 });
 check('oversize party is refused with an explanation', () => {
-  const r = restaurantById.get('rst_kissaten')!; // max 4, closed Sun+Mon
-  const openDay = firstOpenDay('rst_kissaten');
+  const r = restaurantById.get('rst_naru')!; // max 4, closed Sun+Mon
+  const openDay = firstOpenDay('rst_naru');
   const day = generateAvailability(r, openDay, 8);
   assert.ok(day.closedReason?.includes('4'), day.closedReason ?? 'no closedReason returned');
   assert.equal(day.slots.length, 0);
 });
 check('no slot is offered within 90 min of closing', () => {
-  const r = restaurantById.get('rst_grano')!;
-  const date = firstOpenDay('rst_grano');
+  const r = restaurantById.get('rst_ilaya')!;
+  const date = firstOpenDay('rst_ilaya');
   const day = generateAvailability(r, date, 2);
   const closes = r.hours.find((h) => h.day === fromDateKey(date).getDay());
   for (const slot of day.slots) {
@@ -217,7 +229,7 @@ check('demand belongs to the evening, not to each slot', () => {
   // A busy night is a run of full slots, not full ones scattered through a
   // quiet evening. Measured as: the busiest night is meaningfully fuller than
   // the quietest one at the same venue.
-  const restaurant = restaurantById.get('rst_lumen')!;
+  const restaurant = restaurantById.get('rst_emberclay')!;
   const rates: number[] = [];
   for (let i = 1; i <= 28; i += 1) {
     const day = generateAvailability(restaurant, addDaysToKey(todayKey(), i), 2);
@@ -277,24 +289,25 @@ check('a venue closed tonight offers no queue for tonight', () => {
 });
 
 console.log('\n--- query ---');
-const origin = { latitude: 38.7139, longitude: -9.1394 };
-const favorites = new Set(['rst_grano']);
+const origin = { latitude: 12.9716, longitude: 77.5946 };
+const favorites = new Set(['rst_ilaya']);
 const decorated = mockRestaurants.map((r) => decorate(r, origin, favorites));
 
 check('decorate attaches distance and favourite state', () => {
-  const grano = decorated.find((r) => r.id === 'rst_grano')!;
+  const grano = decorated.find((r) => r.id === 'rst_ilaya')!;
   assert.equal(grano.isFavorite, true);
   assert.ok(grano.distanceKm !== null && grano.distanceKm > 0);
 });
 check('search is accent-insensitive', () => {
-  const pombal = decorated.find((r) => r.id === 'rst_pombal')!;
-  assert.equal(matchesQuery(pombal, 'cafe pombal'), true);
-  assert.equal(matchesQuery(pombal, 'Café'), true);
+  // The label the app carries is "Café"; nobody types the accent on a phone.
+  const cafe = decorated.find((r) => r.id === 'rst_filterfoam')!;
+  assert.equal(matchesQuery(cafe, 'cafe indiranagar'), true);
+  assert.equal(matchesQuery(cafe, 'Café'), true);
 });
 check('multi-term search narrows with AND', () => {
-  const grano = decorated.find((r) => r.id === 'rst_grano')!;
-  assert.equal(matchesQuery(grano, 'italian principe'), true);
-  assert.equal(matchesQuery(grano, 'italian belem'), false);
+  const forno = decorated.find((r) => r.id === 'rst_forno')!;
+  assert.equal(matchesQuery(forno, 'italian koramangala'), true);
+  assert.equal(matchesQuery(forno, 'italian malleswaram'), false);
 });
 check('amenity filter is AND, not OR', () => {
   const filtered = applyFilters(decorated, {
@@ -360,8 +373,8 @@ check('occasion matching returns celebration-capable venues', () => {
   assert.equal(suitableForOccasion(decorated, 'none').length, 0);
 });
 check('annotateSlots marks at most two off-peak slots', () => {
-  const r = restaurantById.get('rst_grano')!;
-  const day = generateAvailability(r, firstOpenDay('rst_grano'), 2);
+  const r = restaurantById.get('rst_ilaya')!;
+  const day = generateAvailability(r, firstOpenDay('rst_ilaya'), 2);
   const annotated = annotateSlots(day.slots);
   const marked = annotated.filter((s) => s.recommended);
   assert.ok(marked.length <= 2, `marked ${marked.length}`);
@@ -392,21 +405,21 @@ check('full slots carry a queue only where the venue keeps one', () => {
   }
 });
 check('a walk-in venue offers no queue at all', () => {
-  const walkIn = restaurantById.get('rst_pombal')!;
+  const walkIn = restaurantById.get('rst_thindi')!;
   assert.equal(walkIn.acceptsWaitlist, false);
-  const day = generateAvailability(walkIn, firstOpenDay('rst_pombal'), 2);
+  const day = generateAvailability(walkIn, firstOpenDay('rst_thindi'), 2);
   assert.ok(day.slots.some((s) => s.availability === 'unavailable'), 'no full slot to test');
   assert.ok(day.slots.every((s) => !isWaitlistable(s)));
 });
 check('queue depth is deterministic and within bounds', () => {
-  const r = restaurantById.get('rst_grano')!;
+  const r = restaurantById.get('rst_ilaya')!;
   // A night that actually sells something out, rather than whichever night is
   // open first. Demand belongs to the evening, so Grano's next open night
   // sometimes has no full slot at all and this check is left with nothing to
   // measure — on three days in a year, which is exactly often enough to look
   // like a mystery rather than a bug. It failed on 2026-08-19 and passed again
   // on the 20th. `boardWith` looks three weeks out for a night that qualifies.
-  const date = boardWith('rst_grano', 'full').request.date;
+  const date = boardWith('rst_ilaya', 'full').request.date;
   const first = generateAvailability(r, date, 2).slots.filter(isWaitlistable);
   const second = generateAvailability(r, date, 2).slots.filter(isWaitlistable);
   assert.ok(first.length > 0, 'expected at least one queueable slot');
@@ -425,7 +438,7 @@ check('a full slot nobody has queued for is reachable, and says so', () => {
   // unreachable in the demo while being the ordinary case against the server:
   // a sitting sells out long before anyone queues for it. Walk a year of
   // Grano's boards and require both ends to occur.
-  const r = restaurantById.get('rst_grano')!;
+  const r = restaurantById.get('rst_ilaya')!;
   const depths = new Set<number>();
   const start = new Date('2026-01-01T00:00:00Z');
   for (let i = 0; i < 365; i += 1) {
@@ -438,7 +451,7 @@ check('a full slot nobody has queued for is reachable, and says so', () => {
   assert.ok([...depths].some((d) => d > 0), 'no full slot in a year had anyone queued');
 });
 check('closed days and oversize parties have nothing to queue for', () => {
-  const closed = restaurantById.get('rst_grano')!;
+  const closed = restaurantById.get('rst_ilaya')!;
   // Monday: this venue's closed day.
   const monday = (() => {
     for (let i = 0; i < 8; i += 1) {
@@ -451,7 +464,7 @@ check('closed days and oversize parties have nothing to queue for', () => {
   assert.ok(day.closedReason, 'expected a closed day');
   assert.equal(day.waitlistOpen, false);
 
-  const huge = generateAvailability(closed, firstOpenDay('rst_grano'), closed.maxPartySize + 1);
+  const huge = generateAvailability(closed, firstOpenDay('rst_ilaya'), closed.maxPartySize + 1);
   assert.ok(huge.closedReason);
   assert.equal(huge.waitlistOpen, false);
 });
@@ -524,7 +537,7 @@ function bookingAt(over: Partial<Reservation> = {}): Reservation {
   return {
     id: 'rsv_test',
     code: 'ABC234',
-    restaurantId: 'rst_grano',
+    restaurantId: 'rst_ilaya',
     date: '2026-08-14',
     time: '20:00',
     partySize: 2,
@@ -548,28 +561,28 @@ function refuses(code: ErrorCode, fn: () => void) {
 }
 
 check('a free slot books and a full one does not', () => {
-  const free = boardWith('rst_grano', 'free');
+  const free = boardWith('rst_ilaya', 'free');
   assert.doesNotThrow(() => assertBookable({ ...free, now: Date.now() }));
 
-  const full = boardWith('rst_grano', 'full');
+  const full = boardWith('rst_ilaya', 'full');
   refuses('slot-taken', () => assertBookable({ ...full, now: Date.now() }));
 });
 check('a time the venue never offered is refused, not silently accepted', () => {
-  const board = boardWith('rst_grano', 'free');
+  const board = boardWith('rst_ilaya', 'free');
   refuses('slot-taken', () =>
     assertBookable({ ...board, request: { ...board.request, time: '03:00' }, now: Date.now() }),
   );
 });
 check('a booking in the past is refused with a field message', () => {
-  const board = boardWith('rst_grano', 'free');
+  const board = boardWith('rst_ilaya', 'free');
   const yesterday = addDaysToKey(todayKey(), -1);
   refuses('validation', () =>
     assertBookable({ ...board, request: { ...board.request, date: yesterday }, now: Date.now() }),
   );
 });
 check('a closed day is refused in the venue own words', () => {
-  const restaurant = restaurantById.get('rst_grano')!;
-  const oversize = generateAvailability(restaurant, firstOpenDay('rst_grano'), 40);
+  const restaurant = restaurantById.get('rst_ilaya')!;
+  const oversize = generateAvailability(restaurant, firstOpenDay('rst_ilaya'), 40);
   try {
     assertBookable({
       restaurant,
@@ -586,17 +599,17 @@ check('a closed day is refused in the venue own words', () => {
 });
 check('an unknown restaurant is refused once, at the edge', () => {
   refuses('restaurant-unavailable', () => requireRestaurant(undefined, 'rst_nope'));
-  assert.equal(requireRestaurant(restaurantById.get('rst_grano'), 'rst_grano').id, 'rst_grano');
+  assert.equal(requireRestaurant(restaurantById.get('rst_ilaya'), 'rst_ilaya').id, 'rst_ilaya');
 });
 
 check('a walk-in venue refuses a queue', () => {
-  const board = boardWith('rst_pombal', 'full');
+  const board = boardWith('rst_thindi', 'full');
   refuses('waitlist-closed', () =>
     assertJoinable({ ...board, existing: [], now: Date.now() }),
   );
 });
 check('a slot with a table free refuses a queue and says to book it', () => {
-  const board = boardWith('rst_grano', 'free');
+  const board = boardWith('rst_ilaya', 'free');
   try {
     assertJoinable({ ...board, existing: [], now: Date.now() });
     assert.fail('queued for a bookable slot');
@@ -606,13 +619,13 @@ check('a slot with a table free refuses a queue and says to book it', () => {
   }
 });
 check('joining a full slot returns that slot own queue', () => {
-  const board = boardWith('rst_grano', 'full');
+  const board = boardWith('rst_ilaya', 'full');
   const queue = assertJoinable({ ...board, existing: [], now: Date.now() });
   assert.equal(queue.queueLength, board.slot.waitlist!.queueLength);
   assert.ok(queue.queueLength >= 0);
 });
 check('one place per sitting', () => {
-  const board = boardWith('rst_grano', 'full');
+  const board = boardWith('rst_ilaya', 'full');
   const already = bookingAt({
     id: 'wlt_existing',
     status: 'waitlisted',
@@ -909,7 +922,7 @@ console.log('\n--- what the inbox can say ---');
 const NOTIFICATION_FIXTURE: Reservation = {
   id: 'rsv_fix',
   code: 'ABC234',
-  restaurantId: 'rst_grano',
+  restaurantId: 'rst_ilaya',
   date: todayKey(),
   time: '19:30',
   partySize: 2,
@@ -978,7 +991,7 @@ const PREFS = {
   reminders: true,
   reminderLeadHours: 3,
 };
-const NAMES = new Map([['rst_grano', 'Osteria Grano']]);
+const NAMES = new Map([['rst_ilaya', 'Osteria Grano']]);
 const hoursFromNow = (hours: number) => {
   const at = new Date(Date.now() + hours * 3_600_000);
   return { date: toDateKey(at), time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` };
@@ -1135,7 +1148,7 @@ check('only the two routes a notification is about are reachable', () => {
   for (const href of ['/profile/settings', '/(tabs)/profile', '/', '/reservation/', '/restaurant']) {
     assert.equal(routeFor({ href }), null, `accepted an unlisted route: ${href}`);
   }
-  assert.equal(routeFor({ href: '/restaurant/rst_maiz' }), '/restaurant/rst_maiz');
+  assert.equal(routeFor({ href: '/restaurant/rst_copperkettle' }), '/restaurant/rst_copperkettle');
 });
 
 check('nothing rides along behind a valid id', () => {

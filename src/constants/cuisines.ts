@@ -14,22 +14,29 @@ export interface Labelled<T extends string> {
   icon?: string;
 }
 
+/**
+ * Ordered by how often somebody actually filters by it here, not
+ * alphabetically: the row is horizontal and the first four are the ones a
+ * Bengaluru diner reaches for.
+ */
 export const CUISINES: Labelled<Cuisine>[] = [
+  { value: 'south-indian', label: 'South Indian', icon: 'flame-outline' },
+  { value: 'biryani', label: 'Biryani', icon: 'restaurant-outline' },
+  { value: 'north-indian', label: 'North Indian', icon: 'bonfire-outline' },
+  { value: 'cafe', label: 'Café', icon: 'cafe-outline' },
+  { value: 'chaat', label: 'Chaat & street', icon: 'fast-food-outline' },
+  { value: 'coastal', label: 'Coastal', icon: 'boat-outline' },
+  { value: 'andhra', label: 'Andhra', icon: 'nutrition-outline' },
+  { value: 'kerala', label: 'Kerala', icon: 'leaf-outline' },
+  { value: 'vegetarian', label: 'Pure veg', icon: 'leaf-outline' },
+  { value: 'chinese', label: 'Chinese', icon: 'restaurant-outline' },
+  { value: 'continental', label: 'Continental', icon: 'wine-outline' },
   { value: 'italian', label: 'Italian', icon: 'pizza-outline' },
   { value: 'japanese', label: 'Japanese', icon: 'fish-outline' },
-  { value: 'cafe', label: 'Café', icon: 'cafe-outline' },
-  { value: 'indian', label: 'Indian', icon: 'flame-outline' },
-  { value: 'french', label: 'French', icon: 'wine-outline' },
-  { value: 'mexican', label: 'Mexican', icon: 'nutrition-outline' },
-  { value: 'thai', label: 'Thai', icon: 'leaf-outline' },
-  { value: 'mediterranean', label: 'Mediterranean', icon: 'sunny-outline' },
-  { value: 'korean', label: 'Korean', icon: 'bonfire-outline' },
-  { value: 'american', label: 'American', icon: 'fast-food-outline' },
-  { value: 'chinese', label: 'Chinese', icon: 'restaurant-outline' },
-  { value: 'bakery', label: 'Bakery', icon: 'ice-cream-outline' },
   { value: 'seafood', label: 'Seafood', icon: 'boat-outline' },
-  { value: 'vegetarian', label: 'Vegetarian', icon: 'leaf-outline' },
-  { value: 'middle-eastern', label: 'Middle Eastern', icon: 'moon-outline' },
+  { value: 'bakery', label: 'Bakery', icon: 'ice-cream-outline' },
+  { value: 'american', label: 'American', icon: 'fast-food-outline' },
+  { value: 'indian', label: 'Indian', icon: 'flame-outline' },
 ];
 
 export const CUISINE_LABEL: Record<Cuisine, string> = CUISINES.reduce(

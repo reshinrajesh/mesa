@@ -108,7 +108,7 @@ export default function LocationPickerScreen() {
 
         <View style={{ gap: theme.spacing.sm }}>
           <Text variant="overline" tone="faint">
-            Lisbon neighbourhoods
+            Bengaluru neighbourhoods
           </Text>
 
           {neighbourhoods.map(([name, coordinates], index) => (

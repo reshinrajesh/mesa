@@ -133,12 +133,12 @@ const lastRequest = () => received[received.length - 1];
 
 describe('restaurantServiceHttp', () => {
   it('reaches a real server and returns what it sent', async () => {
-    reply = { status: 200, body: { items: [{ id: 'rst_grano' }], nextCursor: null, total: 1 } };
+    reply = { status: 200, body: { items: [{ id: 'rst_ilaya' }], nextCursor: null, total: 1 } };
 
     const page = await restaurantServiceHttp.getRestaurants({});
 
     expect(page.total).toBe(1);
-    expect(page.items[0].id).toBe('rst_grano');
+    expect(page.items[0].id).toBe('rst_ilaya');
     expect(lastRequest().path).toBe('/restaurants');
   });
 
@@ -174,9 +174,9 @@ describe('restaurantServiceHttp', () => {
   });
 
   it('does not send credentials for public browsing', async () => {
-    reply = { status: 200, body: { id: 'rst_grano' } };
+    reply = { status: 200, body: { id: 'rst_ilaya' } };
 
-    await restaurantServiceHttp.getRestaurantById('rst_grano');
+    await restaurantServiceHttp.getRestaurantById('rst_ilaya');
     expect(lastRequest().authorization).toBeUndefined();
   });
 
@@ -200,7 +200,7 @@ describe('reservationServiceHttp', () => {
     reply = { status: 200, body: { id: 'rsv_1', status: 'confirmed' } };
 
     await reservationServiceHttp.createReservation({
-      restaurantId: 'rst_grano',
+      restaurantId: 'rst_ilaya',
       date: '2026-08-20',
       time: '19:30',
       partySize: 2,
@@ -213,7 +213,7 @@ describe('reservationServiceHttp', () => {
     expect(sent.method).toBe('POST');
     expect(sent.path).toBe('/reservations');
     expect(sent.body).toEqual({
-      restaurantId: 'rst_grano',
+      restaurantId: 'rst_ilaya',
       date: '2026-08-20',
       time: '19:30',
       partySize: 2,
@@ -227,7 +227,7 @@ describe('reservationServiceHttp', () => {
     reply = { status: 200, body: { id: 'wlt_1', status: 'waitlisted' } };
 
     await reservationServiceHttp.joinWaitlist({
-      restaurantId: 'rst_grano',
+      restaurantId: 'rst_ilaya',
       date: '2026-08-20',
       time: '19:30',
       partySize: 2,
@@ -321,10 +321,10 @@ describe('favoriteServiceHttp', () => {
   it('saves idempotently and removes by path', async () => {
     reply = { status: 200, body: null };
 
-    await favoriteServiceHttp.addFavorite('rst_grano');
+    await favoriteServiceHttp.addFavorite('rst_ilaya');
     // PUT, not POST: an optimistic heart can fire twice on a flaky connection,
     // and saving a restaurant twice has to be the same outcome as once.
-    expect(lastRequest()).toMatchObject({ method: 'PUT', path: '/favorites/rst_grano' });
+    expect(lastRequest()).toMatchObject({ method: 'PUT', path: '/favorites/rst_ilaya' });
 
     await favoriteServiceHttp.removeFavorite('rst/../admin');
     expect(lastRequest()).toMatchObject({
@@ -337,12 +337,12 @@ describe('favoriteServiceHttp', () => {
 describe('reviewServiceHttp', () => {
   it('reads reviews without credentials and writes them with', async () => {
     reply = { status: 200, body: { items: [], nextCursor: null, total: 0 } };
-    await reviewServiceHttp.getReviews('rst_grano');
+    await reviewServiceHttp.getReviews('rst_ilaya');
     expect(lastRequest().authorization).toBeUndefined();
 
     reply = { status: 200, body: { id: 'rev_1' } };
     await reviewServiceHttp.createReview({
-      restaurantId: 'rst_grano',
+      restaurantId: 'rst_ilaya',
       reservationId: 'rsv_1',
       rating: 5,
       body: 'Excellent',
@@ -351,7 +351,7 @@ describe('reviewServiceHttp', () => {
 
     const sent = lastRequest();
     expect(sent.authorization).toBe('Bearer test-access-token');
-    expect(sent.path).toBe('/restaurants/rst_grano/reviews');
+    expect(sent.path).toBe('/restaurants/rst_ilaya/reviews');
     // The restaurant is in the path and the author is in the token, so neither
     // is repeated in the body where a client could disagree with them.
     // The reservation stays: it is which visit is being reviewed, and it is

@@ -94,7 +94,7 @@ export default function SavedPlacesScreen() {
 
         <Text variant="caption" tone="faint">
           Adding a new address needs address search, which arrives with the live backend. For now
-          you can pick any Lisbon neighbourhood from the location selector on the home screen.
+          you can pick any Bengaluru neighbourhood from the location selector on the home screen.
         </Text>
       </ScrollView>
     </Screen>

@@ -21,7 +21,7 @@ import { givenStorage, renderScreen } from './harness';
  */
 
 const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() };
-let mockParams: Record<string, string> = { restaurantId: 'rst_grano' };
+let mockParams: Record<string, string> = { restaurantId: 'rst_ilaya' };
 
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
@@ -32,7 +32,7 @@ jest.mock('expo-router', () => ({
 beforeEach(async () => {
   mockRouter.push.mockClear();
   mockRouter.back.mockClear();
-  mockParams = { restaurantId: 'rst_grano' };
+  mockParams = { restaurantId: 'rst_ilaya' };
   // The draft is a module singleton, so a step left over from the last test
   // would decide the next one.
   useReservationDraftStore.getState().reset();
@@ -116,7 +116,7 @@ describe('Reserve screen', () => {
   it('starts at the time step when a card has already chosen one', async () => {
     // Tapping 7:30 PM on a restaurant card has answered the first two
     // questions, and asking them again is the fastest way to lose the booking.
-    mockParams = { restaurantId: 'rst_grano', time: '19:30' };
+    mockParams = { restaurantId: 'rst_ilaya', time: '19:30' };
 
     await renderScreen(<ReserveScreen />);
 

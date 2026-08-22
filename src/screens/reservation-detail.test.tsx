@@ -33,7 +33,7 @@ function reservation(hours: number, overrides: Partial<Reservation> = {}): Reser
   return {
     id: 'rsv_1',
     code: 'ABC234',
-    restaurantId: 'rst_grano',
+    restaurantId: 'rst_ilaya',
     date: toDateKey(at),
     time: `${pad(at.getHours())}:${pad(at.getMinutes())}`,
     partySize: 2,

@@ -43,11 +43,11 @@ export const config = {
    */
   mockFailureRate: Number(process.env.EXPO_PUBLIC_MOCK_FAILURE_RATE ?? 0) || 0,
 
-  /** Default map centre when location permission is refused: downtown Lisbon. */
+  /** Default map centre when location permission is refused: central Bengaluru. */
   fallbackLocation: {
-    latitude: 38.7139,
-    longitude: -9.1394,
-    label: 'Baixa, Lisbon',
+    latitude: 12.9716,
+    longitude: 77.5946,
+    label: 'MG Road, Bengaluru',
   },
 
   /** How far ahead the booking calendar runs. */
@@ -83,6 +83,6 @@ export const config = {
 
   support: {
     email: 'hello@mesa.example',
-    phone: '+351 210 000 000',
+    phone: '+91 80 4000 0000',
   },
 } as const;

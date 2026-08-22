@@ -80,7 +80,7 @@ function referencedRoutes(): { route: string; file: string }[] {
  *
  * Segment-wise rather than by string equality, because the app writes both
  * shapes: `/reserve/[restaurantId]/review` is a pattern, and the seeded inbox
- * carries `/reservation/rsv_grano_upcoming`, a concrete instance of one. Both
+ * carries `/reservation/rsv_ilaya_upcoming`, a concrete instance of one. Both
  * resolve at runtime, and the second is the one a notification actually opens.
  */
 function resolves(reference: string): boolean {
