@@ -12,6 +12,7 @@ import { useAppFonts } from '@/hooks/useAppFonts';
 import { useInboxReconciliation } from '@/hooks/useInboxReconciliation';
 import { useNotificationRouting } from '@/hooks/useNotificationRouting';
 import { usePushRegistration } from '@/hooks/usePushRegistration';
+import { redirectFor } from '@/features/auth/routing';
 import { useAuthStore } from '@/store/authStore';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useSearchStore } from '@/store/searchStore';
@@ -130,6 +131,12 @@ function AppShell() {
  * (reservations, profile) push to sign-in. That is deliberate — forcing an
  * account before someone has seen a single restaurant is the fastest way to
  * lose them.
+ *
+ * The decision itself lives in `features/auth/routing.ts` so it can be
+ * executed. It used to be three lines here, and it sent every guest who tapped
+ * "Log in" straight back to the tabs — a redirect that fires and unwinds is
+ * indistinguishable from a button that does nothing, which is exactly how it
+ * was reported.
  */
 function useProtectedRoute(ready: boolean) {
   const segments = useSegments();
@@ -139,12 +146,7 @@ function useProtectedRoute(ready: boolean) {
   useEffect(() => {
     if (!ready) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (kind === 'anonymous' && !inAuthGroup) {
-      router.replace('/(auth)/welcome');
-    } else if (kind !== 'anonymous' && inAuthGroup) {
-      router.replace('/(tabs)');
-    }
+    const target = redirectFor(kind, segments[0] === '(auth)');
+    if (target) router.replace(target as Parameters<typeof router.replace>[0]);
   }, [ready, kind, segments, router]);
 }
