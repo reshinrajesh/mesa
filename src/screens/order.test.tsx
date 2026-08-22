@@ -9,6 +9,7 @@ import { mockRestaurants } from '@/mock/restaurants';
 import { orderService, paymentService, reservationService } from '@/services';
 import { storage, storageKeys } from '@/utils/storage';
 import { nowMinutes, toDateKey } from '@/utils/date';
+import BookingScreen from '../../app/reservation/[id]/index';
 import OrderScreen from '../../app/reservation/[id]/order';
 import { givenStorage, renderScreen } from './harness';
 
@@ -23,13 +24,21 @@ import { givenStorage, renderScreen } from './harness';
  * what the table ordered has to be what the bill charges for.
  */
 
+// Mutable so a test can point the screen at a table it just created. The
+// `mock` prefix is what lets jest's hoisted factory see it.
+let mockRouteId = 'rsv_order';
+
 jest.mock('expo-router', () => {
   const actual = jest.requireActual('expo-router');
   return {
     ...actual,
-    useLocalSearchParams: () => ({ id: 'rsv_order' }),
+    useLocalSearchParams: () => ({ id: mockRouteId }),
     useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn() }),
   };
+});
+
+beforeEach(() => {
+  mockRouteId = 'rsv_order';
 });
 
 function booking(daysAway: number, status: Reservation['status'] = 'confirmed'): Reservation {
@@ -190,6 +199,26 @@ describe('Order screen', () => {
 
     expect(second.id).toBe(first.id);
   }, 20_000);
+
+  it('the booking screen offers ordering and paying for a table, not just a past one', async () => {
+    // The defect this pins: both buttons lived in the past-booking arm, and a
+    // walk-in is today and confirmed -- so it renders as *upcoming*, and
+    // neither ordering nor the bill was reachable from the table it had just
+    // created. The flow started and then dead-ended.
+    await givenStorage({ reservations: [] });
+    const open = openVenue();
+    if (!open) return;
+
+    const table = await reservationService.startWalkIn(open.id, 2);
+    const dish = menuByRestaurantId.get(open.id)?.sections.flatMap((s) => s.items)[0];
+    await orderService.placeOrder(table.id, [{ menuItemId: dish!.id, quantity: 1 }]);
+
+    mockRouteId = table.id;
+    await renderScreen(<BookingScreen />);
+
+    expect(await screen.findByText(/Order another round|Order at the table/)).toBeTruthy();
+    expect(await screen.findByText(/^Pay the bill/)).toBeTruthy();
+  }, 30_000);
 
   it('sends a round and shows it as sent', async () => {
     await givenStorage({ reservations: [booking(0)] });
