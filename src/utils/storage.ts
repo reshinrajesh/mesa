@@ -101,6 +101,7 @@ export const storageKeys = {
   reviews: 'mesa.reviews',
   bills: 'mesa.bills',
   orders: 'mesa.orders',
+  serviceStates: 'mesa.service-states',
 } as const;
 
 export const secureKeys = {

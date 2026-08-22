@@ -17,6 +17,7 @@ import {
 import { CUISINE_LABEL } from '@/constants/cuisines';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useReservations } from '@/hooks/useReservations';
+import { useStaffBoard } from '@/hooks/useStaffBoard';
 import { useAuthStore } from '@/store/authStore';
 import { useFavoritesStore } from '@/store/favoritesStore';
 import { useTheme } from '@/theme';
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
   const [signOutOpen, setSignOutOpen] = useState(false);
 
   const isGuest = kind === 'guest';
+  const { board } = useStaffBoard();
 
   return (
     <Screen>
@@ -170,6 +172,23 @@ export default function ProfileScreen() {
             onPress={() => router.push('/profile/preferences')}
           />
         </Group>
+
+        {/*
+          Only for somebody who works somewhere. The board is scoped by the
+          venues on their account, so an account with none has nothing to open
+          — and a row that leads to an empty room is worse than no row.
+        */}
+        {board && board.tables.length >= 0 && !isGuest && board.venues.length > 0 ? (
+          <Group title="Floor">
+            <ListRow
+              icon="clipboard-outline"
+              label="Tonight"
+              description={`${board.tables.length} table${board.tables.length === 1 ? '' : 's'} in your rooms`}
+              value={board.tables.reduce((sum, t) => sum + t.roundsWaiting, 0) > 0 ? 'Rounds waiting' : undefined}
+              onPress={() => router.push('/staff')}
+            />
+          </Group>
+        ) : null}
 
         <Group title="App">
           <ListRow

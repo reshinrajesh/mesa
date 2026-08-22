@@ -84,6 +84,12 @@ import {
 } from '@/features/offers/deals';
 import { redirectFor } from '@/features/auth/routing';
 import {
+  canMoveService,
+  nextAction,
+  occupiesTable,
+  serviceRefusal,
+} from '@/features/staff/service';
+import {
   billableOrders,
   canOrder,
   canWithdraw,
@@ -426,6 +432,63 @@ check('a withdrawn round is not billed', () => {
   ];
   assert.equal(billableOrders(rounds).length, 2);
   assert.equal(orderedTotal(rounds), 49_000, 'a withdrawn round reached the bill');
+});
+
+console.log('\n--- the floor ---');
+check('a table walks through its evening, and one step back', () => {
+  assert.equal(canMoveService('booked', 'arrived'), true);
+  assert.equal(canMoveService('arrived', 'seated'), true);
+  assert.equal(canMoveService('seated', 'done'), true);
+  // A host who seats a party as they walk in taps once, not twice.
+  assert.equal(canMoveService('booked', 'seated'), true);
+  // And a tap on the wrong row is the commonest thing on a busy floor, so the
+  // undo is a state transition rather than a trip to the Desk.
+  assert.equal(canMoveService('seated', 'arrived'), true);
+  assert.equal(canMoveService('arrived', 'booked'), true);
+});
+check('a no-show and a cleared table are final', () => {
+  // One is a judgement about a person, the other releases the table to be
+  // laid again. Neither is something to walk back with a tap.
+  for (const target of ['booked', 'arrived', 'seated', 'done'] as const) {
+    assert.equal(canMoveService('no-show', target), false, target);
+  }
+  for (const target of ['booked', 'arrived', 'seated', 'no-show'] as const) {
+    assert.equal(canMoveService('done', target), false, target);
+  }
+  assert.ok(serviceRefusal('no-show', 'seated')?.includes('Reopen'));
+  assert.ok(serviceRefusal('done', 'seated')?.includes('walk-in'));
+  // Finality is said before sameness: a host who taps Clear on a table
+  // somebody else already cleared needs to know what to do with the table,
+  // not be told a word they can already see.
+  assert.ok(serviceRefusal('done', 'done')?.includes('walk-in'));
+});
+check('the refusal names the state the table is actually in', () => {
+  // The commonest cause of a refused tap is two people working the same room,
+  // so the message has to say what the other one did.
+  assert.ok(serviceRefusal('seated', 'seated')?.includes('already seated'));
+  assert.ok(serviceRefusal('arrived', 'done')?.includes('cannot go straight'));
+  assert.equal(serviceRefusal('booked', 'arrived'), null);
+});
+check('only a seated table is holding a table', () => {
+  // Somebody at the door is in the room but not in a chair, and a floor plan
+  // that counted them would show a full house with empty tables in it.
+  assert.equal(occupiesTable('seated'), true);
+  for (const state of ['booked', 'arrived', 'done', 'no-show'] as const) {
+    assert.equal(occupiesTable(state), false, state);
+  }
+});
+check('every state a host sees offers exactly one next move, or none', () => {
+  // A host mid-service is choosing between tables, not between verbs.
+  assert.equal(nextAction('booked')?.to, 'seated');
+  assert.equal(nextAction('arrived')?.to, 'seated');
+  assert.equal(nextAction('seated')?.to, 'done');
+  assert.equal(nextAction('done'), null);
+  assert.equal(nextAction('no-show'), null);
+  // And whatever it offers has to be a move the machine allows.
+  for (const state of ['booked', 'arrived', 'seated'] as const) {
+    const action = nextAction(state);
+    assert.ok(action && canMoveService(state, action.to), state);
+  }
 });
 
 console.log('\n--- geo ---');

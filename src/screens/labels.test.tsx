@@ -86,7 +86,12 @@ describe('every control announces itself', () => {
   it('on home, once the rails have arrived', async () => {
     await givenStorage({ notifications: [notification('a')] });
     await renderScreen(<HomeScreen />);
-    await screen.findAllByLabelText(/^Reserve at/, {}, { timeout: 5_000 });
+    // Anchored on a card rather than on a slot pill: what a venue can offer
+    // depends on the hour the suite runs at, and after the last sitting no card
+    // advertises a time. The pills are the smallest controls in the app, so
+    // they are measured in `RestaurantCard.test.tsx`, where the times are a
+    // fixture instead of a consequence of the clock.
+    await screen.findAllByRole('button', { name: /Rated .* out of 5/ }, { timeout: 5_000 });
 
     expectEveryControlAnnounced();
   });

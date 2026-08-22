@@ -20,6 +20,8 @@ import type {
   RestaurantWithContext,
   Review,
   SearchRestaurantsParams,
+  ServiceState,
+  StaffBoard,
   UpdateReservationInput,
   User,
 } from '@/types';
@@ -200,6 +202,23 @@ export interface OrderService {
   placeOrder(reservationId: string, lines: CartLine[]): Promise<Order>;
   /** Withdraw a round the kitchen has not taken yet. */
   withdrawOrder(orderId: string): Promise<Order>;
+}
+
+/**
+ * The floor, for the people working it.
+ *
+ * No venue in any signature. Which rooms a person works is on the server, in
+ * the join that says so, and a surface where the room came from the client
+ * would be one where changing a variable changes whose evening you are
+ * looking at.
+ */
+export interface StaffService {
+  /** Tonight, in the rooms this account works. */
+  getBoard(): Promise<StaffBoard>;
+  /** Move a table through its evening. */
+  setServiceState(reservationId: string, state: ServiceState): Promise<Reservation>;
+  /** Take a round into the kitchen, or send it out. */
+  advanceRound(orderId: string, state: 'preparing' | 'served'): Promise<Order>;
 }
 
 export interface ReviewService {
