@@ -33,6 +33,7 @@ import { useUiStore } from '@/store/uiStore';
 import { useTheme } from '@/theme';
 import { formatCurrency, formatDistance, joinMeta, priceLabel } from '@/utils/format';
 import { formatMonthYear } from '@/utils/date';
+import { usingImportedVenues } from '@/mock/restaurants';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 320;
@@ -322,6 +323,16 @@ export default function RestaurantDetailScreen() {
               <Text variant="body" tone="muted">
                 {restaurant.address}
               </Text>
+
+              {usingImportedVenues ? (
+                // Required by Google's terms wherever their Places content is
+                // shown, and honest besides: the name, address, hours and
+                // rating on this screen are theirs, while the availability
+                // below it is this app's own simulation.
+                <Text variant="caption" tone="faint">
+                  Venue details and rating from Google. Availability is simulated.
+                </Text>
+              ) : null}
 
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Button

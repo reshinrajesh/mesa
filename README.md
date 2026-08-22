@@ -11,7 +11,7 @@ as a single bucket that returns a tiffin room and a Mughlai grill equally badly.
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 96 domain checks + 168 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 98 domain checks + 168 component, screen, hook and service tests
 ```
 
 ---
@@ -57,6 +57,44 @@ preference was store it. And `Rating` carried an `onPhoto` variant for use over 
 caller ever passed, which in turn was the only route to a palette token. Both are gone. A control
 that controls nothing spends trust that a missing one does not, and a check now asserts that every
 remaining notification preference changes what the app files.
+
+---
+
+## Real venues, when you want them
+
+The sixteen venues are invented. `scripts/import-places.ts` replaces them with real
+Bengaluru ones from the Google Places API:
+
+```bash
+GOOGLE_PLACES_API_KEY=... npx tsx scripts/import-places.ts            # ten neighbourhoods
+GOOGLE_PLACES_API_KEY=... npx tsx scripts/import-places.ts --dry-run  # count them, write nothing
+```
+
+It writes `src/mock/places.generated.ts`, which `mock/restaurants.ts` prefers over the invented set
+whenever it has anything in it. The key is read at build time only — it must never become an
+`EXPO_PUBLIC_*` variable, which would ship it inside the bundle.
+
+Three rules come with using somebody else's data, and each is enforced by something rather than
+written down and hoped for.
+
+**Do not commit what it writes.** Google permits caching Places content for thirty days; a
+generated file in git is a cache with no expiry. So the file carries an `importedAt` stamp and a
+domain check fails once it is older than that — a stale import breaks your build rather than
+quietly going out of date. `git checkout src/mock/places.generated.ts` puts the empty stub back.
+
+**Attribution shows on the venue screen.** "Venue details and rating from Google. Availability is
+simulated" appears under the address whenever the imported dataset is in use, wired from the same
+flag that switches the data.
+
+**No invented review is ever attached to a real restaurant.** The app fabricates availability, queue
+depth, menus and prices, and none of that is attributed to anybody. A review is: it carries a name,
+a rating and an opinion, and under a real business that is somebody's reputation being written for
+them. So `mockReviews` is empty whenever the dataset is real, the rating and review count come from
+Google instead, and a domain check asserts both directions.
+
+What Places will not give you is a menu, a photo, or a table. Menus and prices stay invented for
+imported venues, and the availability under a real restaurant's name is this app's simulation —
+which is what the attribution line says out loud.
 
 ---
 
@@ -140,7 +178,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 96 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 98 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -238,7 +276,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 96 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 98 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -513,7 +551,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 96 checks over the pure domain layer, the palette and the type scale |
+| `npm run test:domain` | 98 checks over the pure domain layer, the palette and the type scale |
 | `npm test` | 168 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |

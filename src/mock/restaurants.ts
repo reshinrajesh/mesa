@@ -1,6 +1,7 @@
 import type { OpeningHours, Restaurant, Weekday } from '@/types';
 
 import { imagePool } from './images';
+import { importedAt, importedVenues } from './places.generated';
 
 /**
  * Sixteen Bengaluru venues.
@@ -92,7 +93,7 @@ const bakeryHours = week({
   6: [h(8), h(21)],
 });
 
-export const mockRestaurants: Restaurant[] = [
+const inventedRestaurants: Restaurant[] = [
   {
     id: 'rst_tiffin',
     name: 'Malleswaram Tiffin Room',
@@ -644,5 +645,23 @@ export const mockRestaurants: Restaurant[] = [
     acceptsWaitlist: true,
   },
 ];
+
+/**
+ * True when the app is drawing real venues imported from Google Places rather
+ * than the invented set below.
+ *
+ * Read by anything that must behave differently about somebody else's
+ * business: the attribution line, and the review generator, which produces
+ * nothing at all for a real restaurant. A fabricated review under a real name
+ * is the one thing this app must never render.
+ */
+export const usingImportedVenues = importedVenues.length > 0;
+
+/** When those venues were fetched, for the caching-window check. */
+export const venuesImportedAt = importedAt;
+
+export const mockRestaurants: Restaurant[] = usingImportedVenues
+  ? importedVenues
+  : inventedRestaurants;
 
 export const restaurantById = new Map(mockRestaurants.map((r) => [r.id, r]));
