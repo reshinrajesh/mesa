@@ -26,16 +26,36 @@ const phone = z
   .min(6, 'Enter a phone number')
   .regex(/^[+]?[\d\s()-]{6,20}$/, 'Use digits, spaces and an optional +');
 
+/** The whole of signing in by mobile: one field, and it has to be a number. */
+export const mobileSignInSchema = z.object({ phone });
+export type MobileSignInValues = z.infer<typeof mobileSignInSchema>;
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, 'Enter your password'),
 });
 export type LoginValues = z.infer<typeof loginSchema>;
 
+/**
+ * Optional, and validated only when there is something to validate.
+ *
+ * An empty string has to pass: the field is on the form, and somebody who
+ * leaves it blank has answered it. `z.string().email().optional()` would reject
+ * that, which is how an optional field ends up blocking a submit.
+ */
+const optionalEmail = z
+  .string()
+  .trim()
+  .max(254, 'That address is longer than we can store')
+  .refine((value) => value === '' || z.string().email().safeParse(value).success, {
+    message: 'That does not look like an email address',
+  })
+  .optional();
+
 export const signUpSchema = z
   .object({
     name: z.string().trim().min(2, 'Enter your name').max(60, 'That name is a little long'),
-    email,
+    email: optionalEmail,
     phone,
     password,
     confirmPassword: z.string(),

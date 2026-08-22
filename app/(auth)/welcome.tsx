@@ -77,8 +77,23 @@ export default function WelcomeScreen() {
           Find somewhere worth eating tonight and hold a table in about twenty seconds.
         </Text>
 
+        {/*
+          The mobile route leads. It is one field and no password, it is how
+          people here expect to start, and it is the same button whether they
+          have an account or not — the server knows which, and asking them to
+          declare it first is a question only the app cares about.
+        */}
+        <Button
+          label="Continue with mobile"
+          fullWidth
+          size="lg"
+          icon="call-outline"
+          onPress={() => router.push('/(auth)/mobile')}
+        />
+
         <Button
           label="Create an account"
+          variant="secondary"
           fullWidth
           size="lg"
           onPress={() => router.push('/(auth)/sign-up')}

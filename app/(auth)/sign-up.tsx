@@ -39,9 +39,9 @@ export default function SignUpScreen() {
     try {
       await signUp({
         name: values.name,
-        email: values.email,
         phone: values.phone,
         password: values.password,
+        email: values.email?.trim() || undefined,
       });
       router.replace('/(tabs)');
     } catch (error) {
@@ -89,33 +89,13 @@ export default function SignUpScreen() {
 
         <Controller
           control={control}
-          name="email"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <Input
-              label="Email"
-              icon="mail-outline"
-              placeholder="you@example.com"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.email?.message}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
           name="phone"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              label="Phone"
+              label="Mobile number"
               icon="call-outline"
               placeholder="+91 98765 43210"
-              hint="Restaurants use this if they need to reach you on the night."
+              hint="This is your account, and how the restaurant reaches you on the night."
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -123,6 +103,27 @@ export default function SignUpScreen() {
               keyboardType="phone-pad"
               autoComplete="tel"
               textContentType="telephoneNumber"
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="email"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <Input
+              label="Email (optional)"
+              icon="mail-outline"
+              placeholder="you@example.com"
+              hint="For your booking confirmations, if you want them by mail as well."
+              value={value ?? ''}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              error={errors.email?.message}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              textContentType="emailAddress"
             />
           )}
         />

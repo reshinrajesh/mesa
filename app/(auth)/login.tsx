@@ -121,7 +121,7 @@ export default function LoginScreen() {
         />
 
         <Pressable
-          onPress={() => router.push('/(auth)/otp')}
+          onPress={() => router.push('/(auth)/mobile')}
           accessibilityRole="button"
           style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center' }}
         >

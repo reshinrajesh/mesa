@@ -21,7 +21,12 @@ interface AuthState {
 
   restore: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (input: { name: string; email: string; phone: string; password: string }) => Promise<void>;
+  signUp: (input: {
+    name: string;
+    phone: string;
+    password: string;
+    email?: string;
+  }) => Promise<void>;
   signInWithProvider: (provider: 'google' | 'apple') => Promise<void>;
   verifyOtp: (destination: string, code: string) => Promise<void>;
   continueAsGuest: () => Promise<void>;

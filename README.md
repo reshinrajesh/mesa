@@ -124,6 +124,12 @@ There is no backend. The login screen prints this, and accepts:
 Any other email with an 8-character password also signs in, as does Google, Apple or
 **Browse without an account**.
 
+**Continue with mobile** is the other way in, and the one this market expects: one field, a
+six-digit code, no password. The same button signs you in or signs you up — a number the server
+knows gets a session, a number it does not gets an account — because which of the two it is belongs
+to the server and not to a question asked before anybody has typed anything. On the sign-up form the
+mobile number is the identifier and the email is genuinely optional.
+
 A fresh install seeds itself so nothing is empty on first run: three saved restaurants, two upcoming
 bookings, one live waitlist entry, four past ones, five notifications. Seeds apply only when nothing
 has ever been written — clearing your favourites and relaunching leaves them cleared.

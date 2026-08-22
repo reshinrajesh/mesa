@@ -78,10 +78,20 @@ export interface AuthService {
   /** Restores a session from storage on cold start. */
   restore(): Promise<{ user: User | null; kind: 'authenticated' | 'guest' | 'anonymous' }>;
   signIn(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }>;
-  signUp(input: { name: string; email: string; phone: string; password: string }): Promise<{
-    user: User;
-    tokens: AuthTokens;
-  }>;
+  /**
+   * Register. The phone number is the identifier; an email is optional.
+   *
+   * That way round because of where this ships: a mobile number is what
+   * people here have and give, and an email is a second thing to remember.
+   * The server derives an internal address for an account that has none, which
+   * is Frappe's constraint rather than the guest's problem.
+   */
+  signUp(input: {
+    name: string;
+    phone: string;
+    password: string;
+    email?: string;
+  }): Promise<{ user: User; tokens: AuthTokens }>;
   requestPasswordReset(email: string): Promise<{ sentTo: string }>;
   /** Returns the channel the code went to, for the "sent to ••• ••• 048" line. */
   requestOtp(destination: string): Promise<{ sentTo: string; expiresInSeconds: number }>;

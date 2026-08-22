@@ -76,7 +76,9 @@ export const authService: AuthService = {
       const user: User = {
         id: localId('usr'),
         name: input.name.trim(),
-        email: input.email.trim().toLowerCase(),
+        // An account registered by phone has no address to show, and inventing
+        // one to fill the field would put a mailbox nobody owns on a profile.
+        email: input.email?.trim().toLowerCase() ?? '',
         phone: input.phone.trim(),
         favoriteCuisines: [],
         dietary: [],
