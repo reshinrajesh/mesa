@@ -1,3 +1,4 @@
+export * from './bill';
 export * from './common';
 export * from './notification';
 export * from './reservation';

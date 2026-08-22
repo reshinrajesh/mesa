@@ -11,7 +11,7 @@ as a single bucket that returns a tiffin room and a Mughlai grill equally badly.
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 98 domain checks + 168 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 102 domain checks + 172 component, screen, hook and service tests
 ```
 
 ---
@@ -34,6 +34,12 @@ converts the entry into a confirmed booking with a code; letting it lapse keeps 
 Cards say so before you commit to a venue: a restaurant with nothing left tonight shows a dashed
 "Full tonight · waitlist" pill where its free times would be, rather than an empty space that reads
 as no availability at all.
+
+**Paying.** The venue raises a bill against a table that has eaten; the guest opens it from the
+booking, sees the lines as the venue priced them, adds a tip or declines one, and pays by UPI or
+card. The server mints the order, the gateway signs the payment, and the server verifies that
+signature before anything reads as paid — no optimistic settle anywhere in it. Amounts are paise
+end to end; `formatPaise` is the only place they become rupees.
 
 **Management.** Upcoming and past bookings with directions, modify, cancel, rebook and rate. Six
 statuses, a two-hour change lock, optimistic cancel with rollback.
@@ -178,7 +184,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 98 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 102 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -276,7 +282,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 98 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 102 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -550,7 +556,7 @@ The foundation was built with these in mind. Each is additive:
 |---|---|
 | Real backend | `services/*.http.ts`, written and tested against a real socket |
 | Push notifications | wired: `usePushRegistration` posts a token to `/push/register` for anyone who has already granted permission. The mock returns null; only the server side is missing |
-| Payments, deposits | a new `paymentService` contract; the review screen has the slot for it |
+| Deposits at booking | the `paymentService` contract is in; the reserve wizard's review screen has the slot |
 | Loyalty, offers, coupons | `uiStore` ambient state + a rail on Home |
 | AI recommendations | replace `scoreRestaurant` in `features/recommendations/engine.ts`, keep `reason` |
 | Multi-city | `uiStore.location` already drives every query key |
@@ -566,8 +572,8 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 98 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 168 component, screen, hook, service and HTTP integration tests |
+| `npm run test:domain` | 102 checks over the pure domain layer, the palette and the type scale |
+| `npm test` | 172 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

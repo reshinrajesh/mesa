@@ -28,10 +28,12 @@ import {
   useReservation,
   useWaitlistStatus,
 } from '@/hooks/useReservations';
+import { useBill } from '@/hooks/useBill';
 import { useRestaurant } from '@/hooks/useRestaurants';
 import { useReservationDraftStore } from '@/store/reservationDraftStore';
 import { useTheme } from '@/theme';
 import { addDaysToKey, combine, formatDateKeyLong, formatTime, todayKey } from '@/utils/date';
+import { formatPaise } from '@/features/payments/bill';
 import { formatPartySize } from '@/utils/format';
 import { directionsUrl } from '@/utils/geo';
 
@@ -57,6 +59,7 @@ export default function ReservationDetailScreen() {
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
+  const { bill } = useBill(id);
 
   if (isError) {
     return (
@@ -316,7 +319,36 @@ export default function ReservationDetailScreen() {
           </View>
         ) : (
           <View style={{ gap: theme.spacing.sm }}>
-            <Button label="Book this again" fullWidth icon="repeat-outline" onPress={rebook} />
+            {/*
+              The bill leads, when there is one. An unpaid bill is the only
+              thing on a finished booking that somebody else is waiting on, and
+              burying it under "Book this again" would be optimistic about
+              which of the two the guest opened this screen for.
+            */}
+            {bill && bill.status === 'open' ? (
+              <Button
+                label={`Pay the bill · ${formatPaise(bill.total)}`}
+                fullWidth
+                icon="card-outline"
+                onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
+              />
+            ) : null}
+            {bill && bill.status === 'paid' ? (
+              <Button
+                label="See the receipt"
+                variant="secondary"
+                fullWidth
+                icon="receipt-outline"
+                onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
+              />
+            ) : null}
+            <Button
+              label="Book this again"
+              variant={bill && bill.status === 'open' ? 'secondary' : 'primary'}
+              fullWidth
+              icon="repeat-outline"
+              onPress={rebook}
+            />
             {reservation.status === 'completed' && !reservation.reviewId ? (
               <Button
                 label="Rate your evening"

@@ -23,6 +23,9 @@ export type ErrorCode =
   | 'waitlist-closed'
   | 'waitlist-duplicate'
   | 'waitlist-offer-expired'
+  | 'bill-settled'
+  | 'bill-void'
+  | 'payment-failed'
   | 'auth-failed'
   | 'rate-limited'
   | 'unknown';
@@ -113,6 +116,25 @@ const COPY: Record<ErrorCode, CopyEntry> = {
     title: 'That table has gone',
     message: 'The hold ran out and the table went to the next party. You are still on the list for this sitting.',
     retryable: false,
+  },
+  'bill-settled': {
+    title: 'This bill is settled',
+    message: 'It was paid already. The receipt is on your booking.',
+    action: 'See the receipt',
+    retryable: false,
+  },
+  'bill-void': {
+    title: 'The venue cancelled this bill',
+    message: 'Nothing is owed on it. Ask the floor if you were expecting one.',
+    retryable: false,
+  },
+  'payment-failed': {
+    // The only refusal in the app where the guest's own money is in question,
+    // so it says what did *not* happen before it says what to do.
+    title: 'That payment did not go through',
+    message: 'Nothing was charged. You can try again, or ask the floor to take it at the till.',
+    action: 'Try again',
+    retryable: true,
   },
   'auth-failed': {
     title: 'Sign-in failed',
