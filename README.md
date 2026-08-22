@@ -119,7 +119,8 @@ There is no backend. The login screen prints this, and accepts:
 |---|---|
 | Email | `ananya.rao@example.com` |
 | Password | `mesa1234` |
-| OTP code | `482913` |
+| Mobile | `+91 98455 12048` |
+| Code | `482913` |
 
 Any other email with an 8-character password also signs in, as does Google, Apple or
 **Browse without an account**.
