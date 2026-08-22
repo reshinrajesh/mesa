@@ -289,8 +289,23 @@ result.
 implementation, so `src/services/index.ts` is the only file that knows which one is in use:
 
 ```bash
-EXPO_PUBLIC_USE_MOCK_SERVICES=false EXPO_PUBLIC_API_BASE_URL=http://localhost:4000 npm start
+EXPO_PUBLIC_USE_MOCK_SERVICES=false EXPO_PUBLIC_API_BASE_URL=http://localhost:8000 npm start
+EXPO_PUBLIC_USE_MOCK_SERVICES=false EXPO_PUBLIC_API_BASE_URL=http://localhost:8000 npm run web
 ```
+
+Run this way and it works: home and Explore draw the server's venues, and Bookings draws the
+signed-in guest's own reservations. Two things bite on the way there, and neither is the app's
+fault:
+
+**A browser needs CORS and Frappe sends none by default.** Every request from `npm run web` is
+blocked with no header in the response to explain why, which reads exactly like the API being down.
+On the Frappe side, `bench --site <site> set-config -p allow_cors '["http://localhost:8081"]'` —
+the backend README says the same thing next to the other affordances a demo site turns on.
+
+**On web the bearer token is not in a keychain.** `expo-secure-store` has no web implementation, so
+`secureStorage` falls back to AsyncStorage under an `insecure.` prefix — deliberate, and fine for
+development on a machine you own. It is `localStorage` in a browser, so treat a web build as a demo
+target rather than a way to sign real people in.
 
 **Every contract has both implementations.** Each `*.http.ts` goes through `request()` from
 `http.ts`, which handles timeout, abort, bearer-token injection from SecureStore, and mapping every
