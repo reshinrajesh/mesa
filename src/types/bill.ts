@@ -45,6 +45,23 @@ export interface Bill {
   lines: BillLine[];
   /** Paise. The sum of the lines, as the venue computed it. */
   subtotal: number;
+  /**
+   * The deal that was honoured, if any.
+   *
+   * Applied to the food subtotal *before* tax, because that is how the tax is
+   * actually charged: GST is levied on what the guest pays for the food, not
+   * on what the menu said before the discount. Getting that order wrong
+   * overcharges the guest by the tax on the discount, which is small, wrong,
+   * and exactly the sort of thing nobody notices for a year.
+   */
+  discount?: {
+    /** "Flat 20% off" — the offer as it was advertised. */
+    label: string;
+    /** Whole percent, so the receipt can show the deal and not just the money. */
+    percent: number;
+    /** Paise taken off. Always positive; it is subtracted, not added. */
+    amount: number;
+  };
   taxes: BillTax[];
   /**
    * Paise, chosen by the guest. Zero is a real answer and the UI must never

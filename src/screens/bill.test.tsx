@@ -3,6 +3,7 @@ import React from 'react';
 
 import type { Reservation } from '@/types';
 
+import { settleTotals } from '@/features/offers/deals';
 import { paymentService } from '@/services';
 import { storage, storageKeys } from '@/utils/storage';
 import { toDateKey } from '@/utils/date';
@@ -90,6 +91,23 @@ describe('Bill screen', () => {
     // Through the gateway and back. The badge appears only once the service
     // has verified the signature and returned a settled bill.
     await waitFor(() => expect(screen.getByText('Paid')).toBeTruthy(), { timeout: 15_000 });
+  }, 20_000);
+
+  it('takes the discount off the food before the tax, and says what was saved', async () => {
+    // rst_ilaya runs 20% off, so the bill this raises carries a discount line —
+    // and the tax under it has to be charged on what is left, not on the menu
+    // price nobody paid.
+    await givenStorage({ reservations: [booking('completed')] });
+    await renderScreen(<BillScreen />);
+
+    const bill = await paymentService.getBill('rsv_bill');
+    expect(bill?.discount).toBeTruthy();
+
+    const untaxed = bill!.subtotal - bill!.discount!.amount;
+    const totals = settleTotals(bill!, 0);
+    expect(totals.taxable).toBe(untaxed);
+    expect(totals.taxes).toBeLessThan(bill!.taxes[0].amount);
+    expect(await screen.findByText(bill!.discount!.label)).toBeTruthy();
   }, 20_000);
 
   it('refuses to pay the same bill twice', async () => {

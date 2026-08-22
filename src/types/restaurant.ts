@@ -60,6 +60,33 @@ export interface OpeningHours {
   closesAt: number | null;
 }
 
+/**
+ * What a venue is offering to get you through the door.
+ *
+ * `percent` is the only kind the bill can actually apply. The others are real
+ * offers a venue runs and the app can advertise, but nothing in Mesa settles a
+ * free drink or a bank cashback — so they are drawn and never arithmetic'd,
+ * and the type keeps them apart rather than letting a screen guess.
+ */
+export type OfferKind =
+  /** A percentage off the food bill, applied when it is paid. */
+  | 'percent'
+  /** "1+1 on cocktails". Honoured at the table, not in the total. */
+  | 'freebie'
+  /** "10% back with HDFC cards". The bank's, not the venue's. */
+  | 'bank';
+
+export interface Offer {
+  id: string;
+  kind: OfferKind;
+  /** The line on the card. Short: it sits in a badge. */
+  label: string;
+  /** The detail behind it, shown on the venue page. */
+  terms?: string;
+  /** Present exactly when `kind === 'percent'`. Whole percent, 1–100. */
+  percent?: number;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -116,6 +143,16 @@ export interface Restaurant {
    * bakery, the café, the mezcal bar — do not, and saying so is better than
    * offering a queue that nobody at the venue is actually reading.
    */
+  /**
+   * The typical spend for two, in whole rupees.
+   *
+   * A price tier says how expensive a place is relative to others; this says
+   * what the evening costs, which is the number people compare. It is a label
+   * and not money moving, so it is rupees rather than the paise a bill uses.
+   */
+  costForTwo: number;
+  /** What the venue is running. Empty is the ordinary case. */
+  offers: Offer[];
   acceptsWaitlist: boolean;
 }
 

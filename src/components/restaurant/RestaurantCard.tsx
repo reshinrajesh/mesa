@@ -6,7 +6,8 @@ import type { RestaurantWithContext } from '@/types';
 
 import { CUISINE_LABEL } from '@/constants/cuisines';
 import { useTheme } from '@/theme';
-import { formatDistance, joinMeta, priceLabel } from '@/utils/format';
+import { headlineOffer } from '@/features/offers/deals';
+import { formatCurrency, formatDistance, joinMeta, priceLabel } from '@/utils/format';
 import { Badge } from '@/components/ui/Badge';
 import { Pressable } from '@/components/ui/Pressable';
 import { Rating } from '@/components/ui/Rating';
@@ -47,9 +48,16 @@ export const RestaurantCard = React.memo(function RestaurantCard({
   const distance = formatDistance(restaurant.distanceKm);
   const meta = joinMeta([
     CUISINE_LABEL[restaurant.cuisines[0]] ?? restaurant.kind,
-    priceLabel(restaurant.priceTier),
+    // What the evening costs, rather than how expensive the place is relative
+    // to others. It is the number people compare, so it replaces the tier when
+    // the venue has published one.
+    restaurant.costForTwo > 0
+      ? `${formatCurrency(restaurant.costForTwo)} for two`
+      : priceLabel(restaurant.priceTier),
     distance,
   ]);
+
+  const offer = headlineOffer(restaurant);
 
   const openBadge = restaurant.isOpenNow
     ? restaurant.minutesUntilStatusChange !== null && restaurant.minutesUntilStatusChange <= 60
@@ -61,7 +69,9 @@ export const RestaurantCard = React.memo(function RestaurantCard({
     <Pressable
       onPress={() => router.push(`/restaurant/${restaurant.id}`)}
       accessibilityRole="button"
-      accessibilityLabel={`${restaurant.name}. ${meta}. Rated ${restaurant.rating} out of 5.`}
+      accessibilityLabel={`${restaurant.name}. ${meta}. Rated ${restaurant.rating} out of 5.${
+        offer ? ` ${offer.label}.` : ''
+      }`}
       accessibilityHint="Opens the restaurant"
       style={{ width }}
       scaleTo={0.975}
@@ -82,6 +92,19 @@ export const RestaurantCard = React.memo(function RestaurantCard({
         />
 
         {openBadge ? <Badge {...openBadge} style={styles.statusBadge} /> : null}
+
+        {/*
+          The deal, on the photo and bottom-left, where the eye lands after the
+          name. One badge and only the best one: a card that shows the smallest
+          of three offers teaches people the badge is not worth reading.
+        */}
+        {offer ? (
+          <Badge
+            label={offer.label}
+            tone={offer.kind === 'percent' ? 'accent' : 'onPhoto'}
+            style={styles.offerBadge}
+          />
+        ) : null}
       </View>
 
       <View style={{ paddingTop: theme.spacing.sm, gap: 3 }}>
@@ -143,6 +166,7 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
   },
+  offerBadge: { position: 'absolute', left: 8, bottom: 8 },
   statusBadge: {
     position: 'absolute',
     left: 8,

@@ -213,6 +213,12 @@ function toRestaurant(place: Place, queried: string): Restaurant | null {
     website: place.websiteUri,
     hours: hoursOf(place),
     amenities: [],
+    // Google knows the price *level* but not the bill, and it has no idea what
+    // a venue is discounting. Inventing either would be putting an offer in a
+    // real restaurant's mouth, so imported venues carry none and the deal
+    // badges simply do not draw.
+    costForTwo: 0,
+    offers: [],
     // Google does not know when a place opened, and guessing would be inventing
     // a fact about a real business. The "just opened" rail simply has nothing
     // to show while the imported dataset is in use.

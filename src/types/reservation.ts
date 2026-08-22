@@ -43,6 +43,15 @@ export interface TimeSlot {
   tablesLeft: number;
   /** Populated by the smart-suggestion layer, e.g. "Usually quieter". */
   hint?: string;
+  /**
+   * Percent off the food bill for booking *this* time, whole percent.
+   *
+   * A venue discounts the hours it cannot fill, so six o'clock is worth more
+   * than eight. That makes the discount a property of the slot rather than of
+   * the restaurant, and it is why the board is worth reading rather than just
+   * the card.
+   */
+  discountPercent?: number;
   /** True when the recommendation engine wants this slot highlighted. */
   recommended?: boolean;
   /** Set when the slot is full but the venue will take a waitlist entry. */
