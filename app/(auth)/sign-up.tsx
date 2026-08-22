@@ -114,7 +114,7 @@ export default function SignUpScreen() {
             <Input
               label="Phone"
               icon="call-outline"
-              placeholder="+351 912 000 000"
+              placeholder="+91 98765 43210"
               hint="Restaurants use this if they need to reach you on the night."
               value={value}
               onChangeText={onChange}

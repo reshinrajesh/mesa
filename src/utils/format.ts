@@ -29,11 +29,26 @@ export function formatReviewCount(count: number): string {
   return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k`;
 }
 
-export function formatCurrency(amount: number, currency = 'EUR'): string {
-  const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', INR: '₹' };
+/**
+ * `₹1,450`, `₹90`.
+ *
+ * Grouped the Indian way — the last three digits, then pairs — because a
+ * four-figure bill written `₹1,450` and one written `₹1450` read as different
+ * amounts to somebody scanning a menu, and every price in this app is rupees
+ * until it is not. The other symbols stay for the day a venue prices in
+ * something else; the default is the currency the app actually ships in.
+ */
+export function formatCurrency(amount: number, currency = 'INR'): string {
+  const symbols: Record<string, string> = { INR: '₹', EUR: '€', USD: '$', GBP: '£' };
   const symbol = symbols[currency] ?? '';
   const value = Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
-  return `${symbol}${value}`;
+  if (currency !== 'INR') return `${symbol}${value}`;
+
+  const [whole, fraction] = value.split('.');
+  const last = whole.slice(-3);
+  const rest = whole.slice(0, -3);
+  const grouped = rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',')},${last}` : last;
+  return `${symbol}${grouped}${fraction ? `.${fraction}` : ''}`;
 }
 
 /** "4 guests" / "1 guest". Party sizes appear everywhere; keep one speller. */

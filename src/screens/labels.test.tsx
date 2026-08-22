@@ -29,14 +29,14 @@ import { controls, expectEveryControlAnnounced, givenStorage, notification, rend
 // Both keys, so one mock serves the wizard (restaurantId) and the venue page (id).
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
-  useLocalSearchParams: () => ({ id: 'rst_grano', restaurantId: 'rst_grano' }),
+  useLocalSearchParams: () => ({ id: 'rst_ilaya', restaurantId: 'rst_ilaya' }),
   Link: 'Link',
 }));
 
 const RESERVATION: Reservation = {
   id: 'rsv_1',
   code: 'ABC234',
-  restaurantId: 'rst_grano',
+  restaurantId: 'rst_ilaya',
   date: toDateKey(new Date(Date.now() + 2 * 24 * 3_600_000)),
   time: '19:30',
   partySize: 2,

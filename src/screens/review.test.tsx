@@ -27,7 +27,7 @@ const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() };
 
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
-  useLocalSearchParams: () => ({ restaurantId: 'rst_grano' }),
+  useLocalSearchParams: () => ({ restaurantId: 'rst_ilaya' }),
   Link: 'Link',
 }));
 
@@ -41,14 +41,14 @@ jest.mock('expo-router', () => ({
  * test is one a user could actually have made.
  */
 function firstBookableSlot(): { date: string; time: string } {
-  const restaurant = restaurantById.get('rst_grano')!;
+  const restaurant = restaurantById.get('rst_ilaya')!;
   for (let day = 1; day < 21; day += 1) {
     const date = addDaysToKey(todayKey(), day);
     const board = generateAvailability(restaurant, date, 2);
     const slot = board.slots.find((s) => s.availability !== 'unavailable');
     if (slot) return { date, time: slot.time };
   }
-  throw new Error('no bookable slot at rst_grano in the next three weeks');
+  throw new Error('no bookable slot at rst_ilaya in the next three weeks');
 }
 
 /** A draft that has been through every step, as the wizard would leave it. */
@@ -56,7 +56,7 @@ function givenDraft(overrides: Partial<ReservationDraft> & { waitlist?: boolean 
   const { date, time } = firstBookableSlot();
   const store = useReservationDraftStore.getState();
   store.reset();
-  store.start('rst_grano', {
+  store.start('rst_ilaya', {
     date,
     time,
     partySize: 2,

@@ -20,7 +20,7 @@ import { givenStorage, renderScreen } from './harness';
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
-  useLocalSearchParams: () => ({ reservationId: 'rsv_1', restaurantId: 'rst_grano' }),
+  useLocalSearchParams: () => ({ reservationId: 'rsv_1', restaurantId: 'rst_ilaya' }),
   Link: 'Link',
 }));
 
@@ -29,7 +29,7 @@ function reservation(overrides: Partial<Reservation> = {}): Reservation {
   return {
     id: 'rsv_1',
     code: 'ABC234',
-    restaurantId: 'rst_grano',
+    restaurantId: 'rst_ilaya',
     date: toDateKey(at),
     time: '19:30',
     partySize: 2,

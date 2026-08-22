@@ -94,14 +94,14 @@ describe('Search screen', () => {
   it('sends a restaurant straight to its own page', async () => {
     await renderScreen(<SearchScreen />);
 
-    await type('Grano');
+    await type('Ilaya');
     await afterTheDebounce();
 
-    fireEvent.press(await screen.findByLabelText(/^Osteria Grano, restaurant/));
+    fireEvent.press(await screen.findByLabelText(/^Ilaya, restaurant/));
 
     // Replace rather than push: the search screen has done its job, and
     // swiping back into a stale query is not going back.
-    expect(mockRouter.replace).toHaveBeenCalledWith('/restaurant/rst_grano');
+    expect(mockRouter.replace).toHaveBeenCalledWith('/restaurant/rst_ilaya');
   });
 
   it('sends a cuisine to the filtered list instead', async () => {
@@ -128,24 +128,24 @@ describe('Search screen', () => {
   });
 
   it('offers a repeat search before it offers anything else', async () => {
-    useSearchStore.setState({ recentSearches: ['Osteria Grano'] });
+    useSearchStore.setState({ recentSearches: ['Ilaya'] });
     await renderScreen(<SearchScreen />);
 
     // Recents live above suggestions and need no query: a repeat search is the
     // most common one there is.
-    fireEvent.press(await screen.findByLabelText('Search again for Osteria Grano'));
+    fireEvent.press(await screen.findByLabelText('Search again for Ilaya'));
 
-    expect(useSearchStore.getState().query).toBe('Osteria Grano');
+    expect(useSearchStore.getState().query).toBe('Ilaya');
     expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)/explore');
   });
 
   it('clears the recent list when asked', async () => {
-    useSearchStore.setState({ recentSearches: ['Osteria Grano', 'Alfama'] });
+    useSearchStore.setState({ recentSearches: ['Ilaya', 'Indiranagar'] });
     await renderScreen(<SearchScreen />);
 
     fireEvent.press(await screen.findByLabelText('Clear recent searches'));
 
     await waitFor(() => expect(useSearchStore.getState().recentSearches).toEqual([]));
-    expect(screen.queryByLabelText('Search again for Alfama')).toBeNull();
+    expect(screen.queryByLabelText('Search again for Indiranagar')).toBeNull();
   });
 });

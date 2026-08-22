@@ -1,19 +1,29 @@
+/**
+ * What a venue cooks, at the grain a diner in Bengaluru would ask for it.
+ *
+ * `indian` on its own is the label nobody searches: it covers a tiffin room
+ * and a Mughlai grill equally badly, and a filter that returns both teaches
+ * people the filter does not work. So the regional ones carry the weight and
+ * `indian` stays for the places that genuinely span several.
+ */
 export type Cuisine =
+  | 'south-indian'
+  | 'north-indian'
+  | 'andhra'
+  | 'kerala'
+  | 'coastal'
+  | 'biryani'
+  | 'chaat'
+  | 'indian'
+  | 'chinese'
+  | 'continental'
   | 'italian'
   | 'japanese'
-  | 'indian'
-  | 'french'
-  | 'mexican'
-  | 'thai'
-  | 'mediterranean'
-  | 'korean'
   | 'american'
-  | 'chinese'
   | 'cafe'
   | 'bakery'
   | 'seafood'
-  | 'vegetarian'
-  | 'middle-eastern';
+  | 'vegetarian';
 
 export type PriceTier = 1 | 2 | 3 | 4;
 

@@ -18,7 +18,7 @@ import { ReservationCard, STATUS_META } from './ReservationCard';
 const RESERVATION: Reservation = {
   id: 'rsv_1',
   code: 'ABC234',
-  restaurantId: 'rst_grano',
+  restaurantId: 'rst_ilaya',
   date: '2026-08-14',
   time: '19:30',
   partySize: 2,

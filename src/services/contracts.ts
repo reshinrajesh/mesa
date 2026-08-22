@@ -79,7 +79,7 @@ export interface AuthService {
     tokens: AuthTokens;
   }>;
   requestPasswordReset(email: string): Promise<{ sentTo: string }>;
-  /** Returns the channel the code went to, for the "sent to +351 ••• 048" line. */
+  /** Returns the channel the code went to, for the "sent to ••• ••• 048" line. */
   requestOtp(destination: string): Promise<{ sentTo: string; expiresInSeconds: number }>;
   verifyOtp(destination: string, code: string): Promise<{ user: User; tokens: AuthTokens }>;
   /** The Google/Apple buttons route here; the mock returns a demo identity. */
