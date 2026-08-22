@@ -11,7 +11,7 @@ as a single bucket that returns a tiffin room and a Mughlai grill equally badly.
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 112 domain checks + 173 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 117 domain checks + 179 component, screen, hook and service tests
 ```
 
 ---
@@ -42,7 +42,13 @@ the table the venue is trying to fill, so the board is worth reading rather than
 deal follows the booking to the bill and comes off the food **before** the tax, which is how the tax
 is actually charged, and the receipt says what was saved including the GST that never applied.
 
-**Paying.** The venue raises a bill against a table that has eaten; the guest opens it from the
+**Ordering at the table.** On the day of your booking the menu becomes orderable: quantities against
+each dish, a round sent to the kitchen, and another round whenever you are ready. A round can be
+withdrawn until the kitchen takes it and not after — the food exists by then. What the table ordered
+is what the bill charges for, at the prices the menu showed when each round was sent.
+
+**Paying.** A table that has ordered can settle up and leave rather than wait for the app to decide
+the evening is over; a table that ordered on paper gets a bill when the booking completes. the guest opens it from the
 booking, sees the lines as the venue priced them, adds a tip or declines one, and pays by UPI or
 card. The server mints the order, the gateway signs the payment, and the server verifies that
 signature before anything reads as paid — no optimistic settle anywhere in it. Amounts are paise
@@ -200,7 +206,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 112 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 117 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -298,7 +304,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 112 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 117 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -588,8 +594,8 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 112 checks over the pure domain layer, the palette and the type scale |
-| `npm test` | 173 component, screen, hook, service and HTTP integration tests |
+| `npm run test:domain` | 117 checks over the pure domain layer, the palette and the type scale |
+| `npm test` | 179 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
 

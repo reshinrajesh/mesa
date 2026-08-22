@@ -28,6 +28,7 @@ import {
   useReservation,
   useWaitlistStatus,
 } from '@/hooks/useReservations';
+import { canOrder } from '@/features/orders/cart';
 import { useBill } from '@/hooks/useBill';
 import { useRestaurant } from '@/hooks/useRestaurants';
 import { useReservationDraftStore } from '@/store/reservationDraftStore';
@@ -60,6 +61,7 @@ export default function ReservationDetailScreen() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const { bill } = useBill(id);
+  const orderable = canOrder(reservation, todayKey());
 
   if (isError) {
     return (
@@ -340,6 +342,19 @@ export default function ReservationDetailScreen() {
                 fullWidth
                 icon="receipt-outline"
                 onPress={() => router.push(`/reservation/${reservation.id}/bill`)}
+              />
+            ) : null}
+            {/*
+              Ordering, on the day. It is above "Book this again" for the same
+              reason the bill is: on the night itself it is the only thing on
+              this screen anybody is here to do.
+            */}
+            {orderable ? (
+              <Button
+                label="Order at the table"
+                fullWidth
+                icon="restaurant-outline"
+                onPress={() => router.push(`/reservation/${reservation.id}/order`)}
               />
             ) : null}
             <Button

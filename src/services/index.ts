@@ -6,6 +6,8 @@ import { favoriteService as favoriteServiceMock } from './favoriteService';
 import { favoriteServiceHttp } from './favoriteService.http';
 import { notificationService as notificationServiceMock } from './notificationService';
 import { notificationServiceHttp } from './notificationService.http';
+import { orderService as orderServiceMock } from './orderService';
+import { orderServiceHttp } from './orderService.http';
 import { paymentService as paymentServiceMock } from './paymentService';
 import { paymentServiceHttp } from './paymentService.http';
 import { reservationService as reservationServiceMock } from './reservationService';
@@ -42,6 +44,8 @@ export const reservationService = config.useMockServices
   : reservationServiceHttp;
 
 export const paymentService = config.useMockServices ? paymentServiceMock : paymentServiceHttp;
+
+export const orderService = config.useMockServices ? orderServiceMock : orderServiceHttp;
 
 export const authService = config.useMockServices ? authServiceMock : authServiceHttp;
 
