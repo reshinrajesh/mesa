@@ -46,7 +46,12 @@ async function writeOrders(orders: Order[]): Promise<void> {
  * and the right one after the phone has been in a pocket for ten minutes.
  */
 function statusOf(order: Order, now: number): Order['status'] {
-  if (order.status === 'cancelled') return 'cancelled';
+  // What the floor said, or failing that, the clock. The derivation is a
+  // stand-in for a person in the kitchen; the moment one has touched the round
+  // it stops guessing.
+  if (order.status === 'cancelled' || order.status === 'preparing' || order.status === 'served') {
+    return order.status;
+  }
   const age = now - Date.parse(order.placedAt);
   if (age < ACCEPTED_AFTER_MS) return 'placed';
   if (age < ACCEPTED_AFTER_MS * 8) return 'preparing';

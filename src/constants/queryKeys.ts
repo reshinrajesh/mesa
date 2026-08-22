@@ -25,6 +25,10 @@ export const queryKeys = {
     all: ['bills'] as const,
     forReservation: (reservationId: string) => ['bills', 'reservation', reservationId] as const,
   },
+  staff: {
+    all: ['staff'] as const,
+    board: () => ['staff', 'board'] as const,
+  },
   orders: {
     all: ['orders'] as const,
     forReservation: (reservationId: string) => ['orders', 'reservation', reservationId] as const,

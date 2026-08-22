@@ -11,6 +11,8 @@ import { orderServiceHttp } from './orderService.http';
 import { paymentService as paymentServiceMock } from './paymentService';
 import { paymentServiceHttp } from './paymentService.http';
 import { reservationService as reservationServiceMock } from './reservationService';
+import { staffService as staffServiceMock } from './staffService';
+import { staffServiceHttp } from './staffService.http';
 import { reservationServiceHttp } from './reservationService.http';
 import { restaurantService as restaurantServiceMock } from './restaurantService';
 import { restaurantServiceHttp } from './restaurantService.http';
@@ -46,6 +48,8 @@ export const reservationService = config.useMockServices
 export const paymentService = config.useMockServices ? paymentServiceMock : paymentServiceHttp;
 
 export const orderService = config.useMockServices ? orderServiceMock : orderServiceHttp;
+
+export const staffService = config.useMockServices ? staffServiceMock : staffServiceHttp;
 
 export const authService = config.useMockServices ? authServiceMock : authServiceHttp;
 

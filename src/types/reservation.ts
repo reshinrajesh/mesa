@@ -144,6 +144,11 @@ export interface Reservation {
    * remind you about.
    */
   walkIn?: boolean;
+  /**
+   * The floor's view of this table, when the server has one. Absent from the
+   * mock's own records, because a mock has no floor.
+   */
+  serviceState?: import('./order').ServiceState;
   /** Present exactly when `status === 'waitlisted'`. */
   waitlist?: WaitlistEntry;
 }

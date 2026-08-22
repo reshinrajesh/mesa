@@ -60,3 +60,41 @@ export interface CartLine {
   quantity: number;
   note?: string;
 }
+
+/**
+ * Where a table is in its evening, as the floor sees it.
+ *
+ * Deliberately not `ReservationStatus`. That one is the guest's word — six
+ * values the app switches screens on — and the floor needs its own vocabulary
+ * for the same table so that a host marking somebody seated is not editing
+ * what a guest's app renders as a badge.
+ */
+export type ServiceState = 'booked' | 'arrived' | 'seated' | 'done' | 'no-show';
+
+/** One row on tonight's board. */
+export interface StaffTable {
+  id: string;
+  restaurantId: string;
+  guestName: string;
+  time: string;
+  partySize: number;
+  status: string;
+  serviceState: ServiceState;
+  walkIn?: boolean;
+  /** Rounds the kitchen has not taken yet — what the floor is watching for. */
+  roundsWaiting: number;
+  roundsSent: number;
+  /**
+   * The oldest round still waiting, so the row's one action has something to
+   * act on. A board that counts rounds but cannot name one has a button that
+   * does nothing.
+   */
+  nextRoundId: string | null;
+  bill: { id: string; status: string; total: number } | null;
+}
+
+export interface StaffBoard {
+  date: string;
+  venues: string[];
+  tables: StaffTable[];
+}
