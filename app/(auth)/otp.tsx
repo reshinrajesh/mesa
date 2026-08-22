@@ -25,7 +25,10 @@ export default function OtpScreen() {
   const theme = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ destination?: string }>();
-  const destination = params.destination ?? 'alex.marques@example.com';
+  // No default. This screen used to fall back to the demo guest's address,
+  // which meant arriving without a destination silently sent a code to
+  // somebody else's account and then asked you for it.
+  const destination = params.destination ?? '';
 
   const verifyOtp = useAuthStore((s) => s.verifyOtp);
   const pending = useAuthStore((s) => s.pending);
@@ -37,11 +40,17 @@ export default function OtpScreen() {
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
 
   useEffect(() => {
+    if (!destination) {
+      // Nothing to send a code to. Back to the field where a number is typed,
+      // rather than a screen asking for a code that was never sent.
+      router.replace({ pathname: '/(auth)/login', params: { method: 'mobile' } });
+      return;
+    }
     authService
       .requestOtp(destination)
       .then((result) => setMaskedTo(result.sentTo))
       .catch(() => setMaskedTo(destination));
-  }, [destination]);
+  }, [destination, router]);
 
   useEffect(() => {
     if (secondsLeft <= 0) return;

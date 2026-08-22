@@ -78,10 +78,24 @@ export interface AuthService {
   /** Restores a session from storage on cold start. */
   restore(): Promise<{ user: User | null; kind: 'authenticated' | 'guest' | 'anonymous' }>;
   signIn(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }>;
-  signUp(input: { name: string; email: string; phone: string; password: string }): Promise<{
-    user: User;
-    tokens: AuthTokens;
-  }>;
+  /**
+   * Register with a mobile number or an email address. Either will do.
+   *
+   * Both are optional in the type and **at least one is required in fact**,
+   * which the server enforces and the sign-up form states with a switch. The
+   * type cannot say "one of these two" without splitting the method in half,
+   * and a caller passing neither gets a field error rather than a crash.
+   *
+   * An account registered by phone alone has no address to be reached at, so
+   * the server derives an unroutable internal one: Frappe names users by
+   * email, and that is its constraint rather than the guest's problem.
+   */
+  signUp(input: {
+    name: string;
+    password: string;
+    phone?: string;
+    email?: string;
+  }): Promise<{ user: User; tokens: AuthTokens }>;
   requestPasswordReset(email: string): Promise<{ sentTo: string }>;
   /** Returns the channel the code went to, for the "sent to ••• ••• 048" line. */
   requestOtp(destination: string): Promise<{ sentTo: string; expiresInSeconds: number }>;

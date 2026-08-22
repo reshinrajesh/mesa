@@ -82,6 +82,7 @@ import {
   savedOnBill,
   settleTotals,
 } from '@/features/offers/deals';
+import { redirectFor } from '@/features/auth/routing';
 import { distanceKm } from '@/utils/geo';
 
 /** First upcoming date on which the venue actually takes bookings. */
@@ -299,6 +300,28 @@ check('a venue offering a percentage discounts its quiet hours at least as much'
     assert.ok(Math.max(...discounts) <= 50, `${restaurant.id} gives away ${Math.max(...discounts)}%`);
     assert.ok(Math.min(...discounts) >= 5, `${restaurant.id} advertises a ${Math.min(...discounts)}% deal`);
   }
+});
+
+console.log('\n--- the route guard ---');
+check('a guest may reach sign-in, because converting later is the point', () => {
+  // The defect this replaced: `kind !== 'anonymous'` bounced guests out of the
+  // auth group, so "Log in" on the profile, "Create account" on the booking
+  // review and both buttons on the welcome screen went to the tabs instead.
+  // A redirect that fires and unwinds looks exactly like a dead button.
+  assert.equal(redirectFor('guest', true), null);
+  assert.equal(redirectFor('guest', false), null);
+  // Stated as the thing that must not happen, so restoring the old condition
+  // fails here by name rather than by an arithmetic mismatch somewhere else.
+  assert.notEqual(redirectFor('guest', true), '/(tabs)');
+});
+check('somebody who has chosen nothing is sent to the welcome screen', () => {
+  assert.equal(redirectFor('anonymous', false), '/(auth)/welcome');
+  // ...but not while they are already on it, which would be a loop.
+  assert.equal(redirectFor('anonymous', true), null);
+});
+check('a signed-in guest is sent out of the auth screens', () => {
+  assert.equal(redirectFor('authenticated', true), '/(tabs)');
+  assert.equal(redirectFor('authenticated', false), null);
 });
 
 console.log('\n--- geo ---');

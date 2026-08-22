@@ -6,7 +6,15 @@ import { Controller, useForm } from 'react-hook-form';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { signUpSchema, type SignUpValues } from '@/validation/schemas';
-import { Button, Input, Pressable, Screen, ScreenHeader, Text } from '@/components/ui';
+import {
+  Button,
+  Input,
+  Pressable,
+  Screen,
+  ScreenHeader,
+  SegmentedControl,
+  Text,
+} from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/store/uiStore';
 import { useTheme } from '@/theme';
@@ -21,10 +29,16 @@ export default function SignUpScreen() {
   const {
     control,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
+      // Mobile first because it is what most people here will use, not
+      // because the other is a lesser option: both are on the switch and
+      // either one registers an account.
+      method: 'mobile',
       name: '',
       email: '',
       phone: '',
@@ -35,13 +49,18 @@ export default function SignUpScreen() {
     mode: 'onBlur',
   });
 
+  const method = watch('method');
+
   const onSubmit = async (values: SignUpValues) => {
     try {
       await signUp({
         name: values.name,
-        email: values.email,
-        phone: values.phone,
         password: values.password,
+        // Whatever was filled in goes, whichever was chosen. Somebody who
+        // signed up by mobile and typed an address as well gets both on their
+        // account, which is what they asked for by typing it.
+        phone: values.phone?.trim() || undefined,
+        email: values.email?.trim() || undefined,
       });
       router.replace('/(tabs)');
     } catch (error) {
@@ -71,6 +90,28 @@ export default function SignUpScreen() {
 
         <Controller
           control={control}
+          name="method"
+          render={({ field: { onChange, value } }) => (
+            <SegmentedControl
+              options={[
+                { value: 'mobile', label: 'Mobile' },
+                { value: 'email', label: 'Email' },
+              ]}
+              value={value}
+              onChange={(next) => {
+                onChange(next);
+                // Clearing the one they turned away from: an error left on a
+                // field nobody can see any more blocks a submit with no way to
+                // find out why.
+                if (next === 'mobile') setValue('email', '', { shouldValidate: false });
+                else setValue('phone', '', { shouldValidate: false });
+              }}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
           name="name"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
@@ -87,35 +128,16 @@ export default function SignUpScreen() {
           )}
         />
 
-        <Controller
-          control={control}
-          name="email"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <Input
-              label="Email"
-              icon="mail-outline"
-              placeholder="you@example.com"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.email?.message}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-          )}
-        />
-
+        {method === 'mobile' ? (
         <Controller
           control={control}
           name="phone"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              label="Phone"
+              label="Mobile number"
               icon="call-outline"
               placeholder="+91 98765 43210"
-              hint="Restaurants use this if they need to reach you on the night."
+              hint="This is your account, and how the restaurant reaches you on the night."
               value={value}
               onChangeText={onChange}
               onBlur={onBlur}
@@ -123,6 +145,32 @@ export default function SignUpScreen() {
               keyboardType="phone-pad"
               autoComplete="tel"
               textContentType="telephoneNumber"
+            />
+          )}
+        />
+        ) : null}
+
+        <Controller
+          control={control}
+          name="email"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <Input
+              label={method === 'email' ? 'Email' : 'Email (optional)'}
+              icon="mail-outline"
+              placeholder="you@example.com"
+              hint={
+                method === 'email'
+                  ? 'This is your account, and where confirmations go.'
+                  : 'For your booking confirmations, if you want them by mail as well.'
+              }
+              value={value ?? ''}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              error={errors.email?.message}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              textContentType="emailAddress"
             />
           )}
         />

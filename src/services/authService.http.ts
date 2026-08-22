@@ -64,7 +64,14 @@ export const authServiceHttp: AuthService = {
     return accept(
       await request<Credentialed>('/auth/sign-up', {
         method: 'POST',
-        body: { ...input, email: input.email.trim().toLowerCase() },
+        // An absent email is sent as absent rather than as an empty string:
+        // the server treats "" as "they typed nothing" either way, but only
+        // one of those is what the client actually knows.
+        body: {
+          ...input,
+          email: input.email?.trim().toLowerCase() || undefined,
+          phone: input.phone?.trim() || undefined,
+        },
         authenticated: false,
       }),
     );
