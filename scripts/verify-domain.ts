@@ -335,6 +335,29 @@ check('a signed-in guest is sent out of the auth screens', () => {
   assert.equal(redirectFor('authenticated', false), null);
 });
 
+console.log('\n--- dining in ---');
+check('a table you are sitting at can be ordered against straight away', () => {
+  // The gap this closes: ordering was keyed to a booking, so somebody who
+  // walked in had nothing to order against.
+  const today = todayKey();
+  // `canOrder` reads status and date only: a walk-in is confirmed and today,
+  // so it qualifies by being what it is rather than by a special case.
+  assert.equal(canOrder({ status: 'confirmed', date: today }, today), true);
+});
+check('a table you are sitting at cannot be edited into a different one', () => {
+  // Date, time and party are facts once somebody is in the chairs. Offering to
+  // edit them is the app pretending it can rearrange a room it cannot see.
+  const walkIn = { ...bookingAt(), walkIn: true, status: 'confirmed' as const };
+  assert.throws(
+    () => assertModifiable(walkIn, Date.now()),
+    (error: unknown) => {
+      assert.ok(isAppError(error) && error.code === 'reservation-locked');
+      assert.ok(error.message.includes('at the table'));
+      return true;
+    },
+  );
+});
+
 console.log('\n--- ordering at the table ---');
 const tableMenu = {
   restaurantId: 'rst_ilaya',

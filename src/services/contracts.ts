@@ -64,6 +64,16 @@ export interface ReservationService {
   getReservations(): Promise<Page<Reservation>>;
   getReservationById(id: string): Promise<Reservation>;
   createReservation(input: CreateReservationInput): Promise<Reservation>;
+  /**
+   * Start a table for somebody standing in the restaurant.
+   *
+   * Not `createReservation` with today's date: booking rules exist to protect
+   * a table nobody is sitting at yet, and every one of them is wrong for a
+   * guest who is already there. No lead time, no two-hour lock, no slot to
+   * hold — the venue has sat them down, and the app's job is to give them
+   * something to order against.
+   */
+  startWalkIn(restaurantId: string, partySize: number): Promise<Reservation>;
   updateReservation(input: UpdateReservationInput): Promise<Reservation>;
   /**
    * Also the way to leave a waitlist: an entry is a reservation that has not

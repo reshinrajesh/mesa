@@ -32,6 +32,13 @@ export const reservationServiceHttp: ReservationService = {
     return request<Reservation>('/reservations', { method: 'POST', body: input });
   },
 
+  startWalkIn(restaurantId, partySize) {
+    return request<Reservation>(
+      `/restaurants/${encodeURIComponent(restaurantId)}/walk-in`,
+      { method: 'POST', body: { partySize } },
+    );
+  },
+
   updateReservation(input) {
     const { id, ...patch } = input;
     return request<Reservation>(`/reservations/${encodeURIComponent(id)}`, {

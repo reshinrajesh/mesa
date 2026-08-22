@@ -4,7 +4,7 @@ import React from 'react';
 import type { Reservation } from '@/types';
 
 import { menuByRestaurantId } from '@/mock/menus';
-import { orderService, paymentService } from '@/services';
+import { orderService, paymentService, reservationService } from '@/services';
 import { storage, storageKeys } from '@/utils/storage';
 import { toDateKey } from '@/utils/date';
 import OrderScreen from '../../app/reservation/[id]/order';
@@ -128,6 +128,37 @@ describe('Order screen', () => {
     await expect(orderService.withdrawOrder(order.id)).rejects.toMatchObject({
       code: 'validation',
     });
+  }, 20_000);
+
+  it('a walk-in table can order without a booking behind it', async () => {
+    // The whole point of dining in: somebody who never booked has a table, and
+    // the ordering path is the same one a booking uses.
+    await givenStorage({ reservations: [] });
+
+    const table = await reservationService.startWalkIn('rst_thindi', 2);
+    expect(table.walkIn).toBe(true);
+    expect(table.status).toBe('confirmed');
+
+    const dish = menuByRestaurantId
+      .get('rst_thindi')
+      ?.sections.flatMap((section) => section.items)[0];
+    const round = await orderService.placeOrder(table.id, [
+      { menuItemId: dish!.id, quantity: 1 },
+    ]);
+
+    const bill = await paymentService.getBill(table.id);
+    expect(bill!.subtotal).toBe(round.subtotal);
+  }, 20_000);
+
+  it('a second dine-in at the same venue joins the table already open', async () => {
+    // Two tables would split a party's rounds across two bills, which nobody
+    // notices until they come to pay.
+    await givenStorage({ reservations: [] });
+
+    const first = await reservationService.startWalkIn('rst_thindi', 2);
+    const second = await reservationService.startWalkIn('rst_thindi', 4);
+
+    expect(second.id).toBe(first.id);
   }, 20_000);
 
   it('sends a round and shows it as sent', async () => {

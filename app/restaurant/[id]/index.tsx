@@ -34,6 +34,7 @@ import { useTheme } from '@/theme';
 import { formatCurrency, formatDistance, joinMeta, priceLabel } from '@/utils/format';
 import { formatMonthYear } from '@/utils/date';
 import { usingImportedVenues } from '@/mock/restaurants';
+import { WalkInSheet } from '@/features/reservations/WalkInSheet';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const HERO_HEIGHT = 320;
@@ -62,6 +63,7 @@ export default function RestaurantDetailScreen() {
   const scrollY = useSharedValue(0);
   const { hidden, onScroll: ctaScroll } = useScrollHideCta();
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [walkInOpen, setWalkInOpen] = useState(false);
 
   useEffect(() => {
     if (id) markViewed(id);
@@ -433,20 +435,44 @@ export default function RestaurantDetailScreen() {
           </View>
         ) : null}
 
-        <Button
-          label="Reserve a table"
-          size="lg"
-          fullWidth
-          icon="arrow-forward"
-          iconPosition="right"
-          onPress={() =>
-            router.push({
-              pathname: '/reserve/[restaurantId]',
-              params: { restaurantId: restaurant.id },
-            })
-          }
-        />
+        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+          <Button
+            label="Reserve a table"
+            size="lg"
+            icon="arrow-forward"
+            iconPosition="right"
+            style={{ flex: 1 }}
+            onPress={() =>
+              router.push({
+                pathname: '/reserve/[restaurantId]',
+                params: { restaurantId: restaurant.id },
+              })
+            }
+          />
+
+          {/*
+            Only while the doors are open, because it is for somebody standing
+            inside them. Offering it to a closed venue would be the app
+            inviting people to a room with the lights off.
+          */}
+          {restaurant.isOpenNow ? (
+            <Button
+              label="Dine in"
+              variant="secondary"
+              size="lg"
+              icon="restaurant-outline"
+              onPress={() => setWalkInOpen(true)}
+              accessibilityHint="For a table you are already sitting at"
+            />
+          ) : null}
+        </View>
       </Animated.View>
+
+      <WalkInSheet
+        restaurant={restaurant}
+        open={walkInOpen}
+        onClose={() => setWalkInOpen(false)}
+      />
     </View>
   );
 }
