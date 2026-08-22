@@ -25,7 +25,13 @@ export type SlotAvailability = 'available' | 'limited' | 'unavailable';
  * A full slot with no `waitlist` is exactly that: full, with nothing to join.
  */
 export interface SlotWaitlist {
-  /** Parties already queued for this time. Never zero — an empty queue is a free table. */
+  /**
+   * Parties already queued for this time. Zero is ordinary, not impossible: a
+   * slot sells out long before anybody queues for it, so most full slots carry
+   * an empty queue. The copy for that case is `queueDepthLabel`, not
+   * `queueLabel` — "a table is yours" is about an entry at the front of a
+   * queue, and there is no table here at all.
+   */
   queueLength: number;
 }
 

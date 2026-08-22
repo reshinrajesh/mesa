@@ -5,7 +5,7 @@ import { StyleSheet, View } from 'react-native';
 import type { TimeSlot } from '@/types';
 
 import { annotateSlots } from '@/features/recommendations/engine';
-import { isWaitlistable, queueLabel } from '@/features/reservations/waitlist';
+import { isWaitlistable, queueDepthLabel } from '@/features/reservations/waitlist';
 import { useTheme } from '@/theme';
 import { formatTime, timeToMinutes } from '@/utils/date';
 import { haptics } from '@/utils/haptics';
@@ -79,7 +79,7 @@ export function SlotPicker({ slots, value, onChange }: SlotPickerProps) {
                     unavailable
                       ? `${formatTime(slot.time)}, fully booked`
                       : queueable
-                        ? `${formatTime(slot.time)}, fully booked, join the waitlist, ${queueLabel(
+                        ? `${formatTime(slot.time)}, fully booked, join the waitlist, ${queueDepthLabel(
                             slot.waitlist!.queueLength,
                           )}`
                         : limited

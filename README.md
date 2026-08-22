@@ -6,7 +6,7 @@ It runs entirely on mock data: clone, install, start, and every screen works wit
 ```bash
 npm install
 npm start          # then press i / a, or scan the QR with Expo Go
-npm run verify     # typecheck + lint + 94 domain checks + 160 component, screen, hook and service tests
+npm run verify     # typecheck + lint + 95 domain checks + 160 component, screen, hook and service tests
 ```
 
 ---
@@ -108,6 +108,7 @@ asserts that every kind the inbox can draw is one something can produce.
 | Closed that day | pick a Monday at Osteria Grano |
 | Nothing left today | browse after the last seating |
 | Sold out, waitlist offered | an evening at a popular venue — ~2% of nights entirely, 10–25% at peak |
+| A full slot nobody has queued for yet | most sold-out sittings — the queue behind one is empty far more often than not |
 | Waitlist queued → offered → lapsed | the seeded entry, within a minute of first launch |
 | A tapped notification opening what it is about | tap the waitlist alert, from the lock screen or a cold start |
 | Every notification kind | book, change and cancel a table; the rest arrive on their own |
@@ -134,7 +135,7 @@ domain checks; the screen only draws it.
 
 ### Why there are component tests as well
 
-Every bug in that first paragraph got through a green `npm run verify`. The 94 domain checks are
+Every bug in that first paragraph got through a green `npm run verify`. The 95 domain checks are
 good at what they cover and structurally blind to the rest: a function that returns the right value
 tells you nothing about whether a branch is on screen. So `npm test` renders. It is deliberately
 small and deliberately about *which state is showing* rather than about markup or copy, because a
@@ -232,7 +233,7 @@ src/
 
 The rule the layout enforces: **`app/` contains no business logic** — and neither does `services/`.
 Filtering, sorting, opening hours, availability, recommendations, the waitlist and the rules
-governing what may be booked all live in `src/features/` as pure functions, which is why 94 checks
+governing what may be booked all live in `src/features/` as pure functions, which is why 95 checks
 can be executed by `npm run test:domain` with no renderer, no storage mock and no real clock.
 
 What is left in a service is what a service is for: reading storage, writing storage, minting ids.
@@ -495,7 +496,7 @@ The foundation was built with these in mind. Each is additive:
 | `npm run ios` / `android` | native build (needed for real map tiles) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm run test:domain` | 94 checks over the pure domain layer, the palette and the type scale |
+| `npm run test:domain` | 95 checks over the pure domain layer, the palette and the type scale |
 | `npm test` | 160 component, screen, hook, service and HTTP integration tests |
 | `npm run verify` | all three |
 | `npm run check:deps` | confirm every dependency matches the Expo SDK |
